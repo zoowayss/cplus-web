@@ -38,6 +38,12 @@ public:
     // 获取上一次插入操作的ID
     unsigned long long getLastInsertId();
     
+    // 转义SQL字符串，防止SQL注入
+    std::string escapeString(const std::string& str);
+    
+    // 获取MySQL连接对象
+    MYSQL* getConnection() const;
+    
     // 关闭数据库连接
     void close();
     

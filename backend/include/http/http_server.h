@@ -40,6 +40,15 @@ namespace http {
             }
             return "";
         }
+        
+        // 获取不带查询参数的路径
+        std::string get_base_path() const {
+            size_t pos = path.find('?');
+            if (pos != std::string::npos) {
+                return path.substr(0, pos);
+            }
+            return path;
+        }
     };
     
     // HTTP响应结构
@@ -91,6 +100,16 @@ namespace http {
     // 路由处理器函数类型
     using RouteHandler = std::function<void(const Request&, Response&)>;
     
+    // 路由匹配项
+    struct Route {
+        std::string pattern;
+        RouteHandler handler;
+        bool is_regex;
+        
+        Route(const std::string& p, RouteHandler h, bool r = false)
+            : pattern(p), handler(h), is_regex(r) {}
+    };
+    
     // HTTP服务器类
     class HttpServer {
     private:
@@ -98,7 +117,7 @@ namespace http {
         int server_fd_;
         std::atomic<bool> running_;
         std::thread server_thread_;
-        std::map<std::string, std::map<std::string, RouteHandler>> routes_;
+        std::map<std::string, std::vector<Route>> routes_;
         
         // 解析HTTP请求
         Request parse_request(const std::string& request_str) {
@@ -145,6 +164,31 @@ namespace http {
             return req;
         }
         
+        // 检查路径是否匹配路由模式
+        bool path_matches(const std::string& path, const std::string& pattern, bool is_regex) {
+            if (is_regex) {
+                // 如果是正则表达式模式，检查路径是否满足正则
+                // 注意：这里使用简单的字符串匹配，不是真正的正则表达式
+                // 实际应用中应使用regex库进行匹配
+                if (pattern.find('[') != std::string::npos) {
+                    // 数字占位符处理，例如 "/api/problems/[0-9]+"
+                    size_t start_pos = pattern.find('/');
+                    size_t end_pos = pattern.find('[');
+                    std::string prefix = pattern.substr(0, end_pos);
+                    
+                    if (path.substr(0, prefix.length()) == prefix) {
+                        // 路径以模式前缀开始，视为匹配
+                        // 这是一个简化的匹配，实际应用中应更严谨
+                        return true;
+                    }
+                }
+                return false;
+            } else {
+                // 普通路径，直接比较
+                return path == pattern;
+            }
+        }
+        
         // 处理客户端连接
         void handle_client(int client_fd) {
             char buffer[8192] = {0};
@@ -168,24 +212,39 @@ namespace http {
                     response.status_message = "OK";
                     response.body = "";
                 } else {
+                    // 获取不带查询参数的基本路径
+                    std::string base_path = request.get_base_path();
+                    std::cout << "处理请求: " << request.method << " " << request.path << " (基本路径: " << base_path << ")" << std::endl;
+                    
                     // 查找匹配的路由处理器
                     auto method_it = routes_.find(request.method);
+                    bool route_found = false;
+                    
                     if (method_it != routes_.end()) {
-                        auto route_it = method_it->second.find(request.path);
-                        if (route_it != method_it->second.end()) {
-                            // 调用处理器
-                            route_it->second(request, response);
-                        } else {
+                        // 先检查精确匹配
+                        for (const auto& route : method_it->second) {
+                            if (path_matches(base_path, route.pattern, route.is_regex)) {
+                                // 调用处理器
+                                std::cout << "找到匹配的路由: " << route.pattern << std::endl;
+                                route.handler(request, response);
+                                route_found = true;
+                                break;
+                            }
+                        }
+                        
+                        if (!route_found) {
                             // 路径不存在
+                            std::cout << "未找到匹配的路由" << std::endl;
                             response.status_code = 404;
                             response.status_message = "Not Found";
-                            response.json("{\"error\": \"Resource not found\"}");
+                            response.json("{\"status\": \"error\", \"message\": \"Resource not found\"}");
                         }
                     } else {
                         // 方法不支持
+                        std::cout << "不支持的请求方法: " << request.method << std::endl;
                         response.status_code = 405;
                         response.status_message = "Method Not Allowed";
-                        response.json("{\"error\": \"Method not allowed\"}");
+                        response.json("{\"status\": \"error\", \"message\": \"Method not allowed\"}");
                     }
                 }
                 
@@ -243,7 +302,8 @@ namespace http {
         
         // 添加路由
         void add_route(const std::string& method, const std::string& path, RouteHandler handler) {
-            routes_[method][path] = handler;
+            bool is_regex = (path.find('[') != std::string::npos);
+            routes_[method].push_back(Route(path, handler, is_regex));
         }
         
         // GET方法路由

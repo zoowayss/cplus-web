@@ -83,6 +83,32 @@ unsigned long long Database::getLastInsertId() {
     return mysql_insert_id(conn);
 }
 
+std::string Database::escapeString(const std::string& str) {
+    if (conn == nullptr) {
+        std::cerr << "MySQL连接未初始化" << std::endl;
+        return str;
+    }
+    
+    // 分配足够的空间存储转义后的字符串
+    // MySQL文档建议分配2倍原始字符串长度+1的空间
+    char* buffer = new char[str.length() * 2 + 1];
+    
+    // 转义字符串
+    mysql_real_escape_string(conn, buffer, str.c_str(), str.length());
+    
+    // 将结果转换为std::string
+    std::string result(buffer);
+    
+    // 释放内存
+    delete[] buffer;
+    
+    return result;
+}
+
+MYSQL* Database::getConnection() const {
+    return conn;
+}
+
 void Database::close() {
     if (conn != nullptr) {
         mysql_close(conn);

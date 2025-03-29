@@ -74,6 +74,51 @@ int main(int argc, char** argv) {
         std::cout << "用户表已就绪" << std::endl;
     }
     
+    // 创建题目表
+    std::string create_problems_table = 
+        "CREATE TABLE IF NOT EXISTS problems ("
+        "id INT AUTO_INCREMENT PRIMARY KEY,"
+        "title VARCHAR(255) NOT NULL,"
+        "description TEXT NOT NULL,"
+        "input_format TEXT NOT NULL,"
+        "output_format TEXT NOT NULL,"
+        "difficulty ENUM('简单', '中等', '困难') NOT NULL DEFAULT '中等',"
+        "time_limit INT NOT NULL DEFAULT 1000," // 默认1000ms
+        "memory_limit INT NOT NULL DEFAULT 65536," // 默认64MB
+        "example_input TEXT,"
+        "example_output TEXT,"
+        "hint TEXT,"
+        "created_by INT NOT NULL,"
+        "created_at BIGINT NOT NULL,"
+        "updated_at BIGINT NOT NULL,"
+        "status TINYINT NOT NULL DEFAULT 1," // 1: 启用, 0: 禁用
+        "FOREIGN KEY (created_by) REFERENCES users(id)"
+        ")";
+
+    if (!db->executeCommand(create_problems_table)) {
+        std::cerr << "创建题目表失败" << std::endl;
+    } else {
+        std::cout << "题目表已就绪" << std::endl;
+    }
+    
+    // 创建测试用例表
+    std::string create_testcases_table = 
+        "CREATE TABLE IF NOT EXISTS testcases ("
+        "id INT AUTO_INCREMENT PRIMARY KEY,"
+        "problem_id INT NOT NULL,"
+        "input TEXT NOT NULL,"
+        "expected_output TEXT NOT NULL,"
+        "is_example BOOLEAN NOT NULL DEFAULT FALSE,"
+        "created_at BIGINT NOT NULL,"
+        "FOREIGN KEY (problem_id) REFERENCES problems(id) ON DELETE CASCADE"
+        ")";
+    
+    if (!db->executeCommand(create_testcases_table)) {
+        std::cerr << "创建测试用例表失败" << std::endl;
+    } else {
+        std::cout << "测试用例表已就绪" << std::endl;
+    }
+    
     // 启动HTTP服务器
     if (!server->start()) {
         std::cerr << "HTTP服务器启动失败" << std::endl;

@@ -30,10 +30,11 @@ service.interceptors.request.use(
 service.interceptors.response.use(
   response => {
     const res = response.data
-    console.log(res);
+    console.log('API响应:', res);
     
-    // 请求成功
-    if (res.code === 200 || res.status === 'ok') {
+    // 请求成功 - 额外处理"正在评测"的特殊情况
+    if (res.code === 200 || res.status === 'ok' || 
+        (res.message && typeof res.message === 'string' && res.message.includes('正在评测'))) {
       return res
     } else {
       // 显示错误消息
@@ -50,7 +51,19 @@ service.interceptors.response.use(
   },
   error => {
     console.error('响应错误: ', error)
-    Message.error(error.response?.data?.message || error.message || '网络错误')
+    
+    // 检查是否是评测相关的错误，如果是则认为是成功的
+    const errorMessage = error.response?.data?.message || error.message || '';
+    if (typeof errorMessage === 'string' && errorMessage.includes('正在评测')) {
+      // 这是一个特殊情况，实际上是成功的
+      return {
+        status: 'ok',
+        message: errorMessage,
+        submission_id: Date.now() // 如果API没有返回submission_id，则生成一个临时ID
+      };
+    }
+    
+    Message.error(errorMessage || '网络错误')
     return Promise.reject(error)
   }
 )

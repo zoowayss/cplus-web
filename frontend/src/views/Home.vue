@@ -24,110 +24,142 @@
       <el-container>
         <el-aside :width="isCollapse ? '64px' : '200px'">
           <el-menu
-            default-active="1"
+            :default-active="activeMenu"
             class="el-menu-vertical"
             background-color="#545c64"
             text-color="#fff"
             :collapse="isCollapse"
-            active-text-color="#ffd04b">
-            <el-menu-item index="1">
+            active-text-color="#ffd04b"
+            @select="handleSelect">
+            <el-menu-item index="dashboard">
               <i class="el-icon-s-home"></i>
               <span slot="title">首页</span>
             </el-menu-item>
-            <el-menu-item index="2">
-              <i class="el-icon-document"></i>
-              <span slot="title">内容管理</span>
+            <el-submenu index="problem-management">
+              <template slot="title">
+                <i class="el-icon-s-order"></i>
+                <span>题目管理</span>
+              </template>
+              <el-menu-item index="problem-list">
+                <i class="el-icon-tickets"></i>
+                <span>题目列表</span>
+              </el-menu-item>
+              <el-menu-item index="problem-create">
+                <i class="el-icon-plus"></i>
+                <span>添加题目</span>
+              </el-menu-item>
+            </el-submenu>
+            <el-menu-item index="user-management">
+              <i class="el-icon-s-custom"></i>
+              <span slot="title">用户管理</span>
             </el-menu-item>
-            <el-menu-item index="3">
-              <i class="el-icon-setting"></i>
+            <el-menu-item index="submission-management">
+              <i class="el-icon-s-data"></i>
+              <span slot="title">提交记录</span>
+            </el-menu-item>
+            <el-menu-item index="system-settings">
+              <i class="el-icon-s-tools"></i>
               <span slot="title">系统设置</span>
             </el-menu-item>
           </el-menu>
         </el-aside>
         
         <el-main>
-          <el-row :gutter="20">
-            <el-col :span="24">
-              <el-card class="welcome-card">
-                <div slot="header">
-                  <span>在线评测系统管理后台</span>
-                </div>
-                <div class="welcome-content">
-                  <h1>欢迎回来，{{ username }}！</h1>
-                  <p>您已成功登录管理后台。在这里您可以管理用户、题目、提交记录和系统设置。</p>
-                </div>
-              </el-card>
-            </el-col>
-          </el-row>
+          <!-- 根据选中的菜单动态展示内容或使用路由显示 -->
+          <router-view v-if="$route.matched.length > 1"></router-view>
           
-          <el-row :gutter="20" class="card-row">
-            <el-col :xs="24" :sm="24" :md="12" :lg="8" :xl="8" v-for="(card, index) in dashboardCards" :key="index">
-              <el-card shadow="hover" :body-style="{ padding: '20px' }">
-                <div class="dashboard-card">
-                  <div class="card-icon" :style="{ backgroundColor: card.color }">
-                    <i :class="card.icon"></i>
-                  </div>
-                  <div class="card-content">
-                    <h3>{{ card.title }}</h3>
-                    <div class="card-number">{{ card.number }}</div>
-                    <div class="card-description">{{ card.description }}</div>
-                  </div>
-                </div>
-              </el-card>
-            </el-col>
-          </el-row>
+          <!-- 如果没有匹配的子路由，但有currentComponent，则显示组件 -->
+          <component 
+            :is="currentComponent" 
+            v-else-if="currentComponent" 
+            :params="componentParams">
+          </component>
           
-          <el-row :gutter="20" class="card-row">
-            <el-col :xs="24" :sm="24" :md="24" :lg="16" :xl="16">
-              <el-card>
-                <div slot="header" class="card-header">
-                  <span>最近提交记录</span>
-                  <el-button style="padding: 3px 0" type="text" @click="viewAllSubmissions">
-                    查看全部
-                  </el-button>
-                </div>
-                <div class="responsive-table">
-                  <el-table :data="recentSubmissions" style="width: 100%">
-                    <el-table-column prop="id" label="ID" width="60" :show-overflow-tooltip="true"></el-table-column>
-                    <el-table-column prop="problemTitle" label="题目" min-width="120" :show-overflow-tooltip="true"></el-table-column>
-                    <el-table-column prop="user" label="用户" width="100" :show-overflow-tooltip="true"></el-table-column>
-                    <el-table-column prop="status" label="状态" width="100" :show-overflow-tooltip="true">
-                      <template slot-scope="scope">
-                        <el-tag :type="getStatusType(scope.row.status)" size="mini">
-                          {{ scope.row.status }}
-                        </el-tag>
-                      </template>
-                    </el-table-column>
-                    <el-table-column prop="time" label="时间" width="160" :show-overflow-tooltip="true"></el-table-column>
-                  </el-table>
-                </div>
-              </el-card>
-            </el-col>
+          <!-- 如果没有匹配的子路由和currentComponent，则显示仪表盘内容 -->
+          <div v-else-if="activeMenu === 'dashboard'">
+            <el-row :gutter="20">
+              <el-col :span="24">
+                <el-card class="welcome-card">
+                  <div slot="header">
+                    <span>在线评测系统管理后台</span>
+                  </div>
+                  <div class="welcome-content">
+                    <h1>欢迎回来，{{ username }}！</h1>
+                    <p>您已成功登录管理后台。在这里您可以管理用户、题目、提交记录和系统设置。</p>
+                  </div>
+                </el-card>
+              </el-col>
+            </el-row>
             
-            <el-col :xs="24" :sm="24" :md="24" :lg="8" :xl="8">
-              <el-card>
-                <div slot="header" class="card-header">
-                  <span>系统通知</span>
-                  <el-button style="padding: 3px 0" type="text" @click="viewAllNotifications">
-                    查看全部
-                  </el-button>
-                </div>
-                <div class="notification-list">
-                  <div v-for="(notification, index) in notifications" :key="index" class="notification-item">
-                    <div class="notification-title">
-                      <i :class="notification.icon" :style="{ color: notification.color }"></i>
-                      <span>{{ notification.title }}</span>
+            <el-row :gutter="20" class="card-row">
+              <el-col :xs="24" :sm="24" :md="12" :lg="8" :xl="8" v-for="(card, index) in dashboardCards" :key="index">
+                <el-card shadow="hover" :body-style="{ padding: '20px' }">
+                  <div class="dashboard-card">
+                    <div class="card-icon" :style="{ backgroundColor: card.color }">
+                      <i :class="card.icon"></i>
                     </div>
-                    <div class="notification-time">{{ notification.time }}</div>
-                    <div class="notification-content">{{ notification.content }}</div>
+                    <div class="card-content">
+                      <h3>{{ card.title }}</h3>
+                      <div class="card-number">{{ card.number }}</div>
+                      <div class="card-description">{{ card.description }}</div>
+                    </div>
                   </div>
-                  <div v-if="notifications.length === 0" class="empty-data">
-                    暂无通知
+                </el-card>
+              </el-col>
+            </el-row>
+            
+            <el-row :gutter="20" class="card-row">
+              <el-col :xs="24" :sm="24" :md="24" :lg="16" :xl="16">
+                <el-card>
+                  <div slot="header" class="card-header">
+                    <span>最近提交记录</span>
+                    <el-button style="padding: 3px 0" type="text" @click="handleSelect('submission-management')">
+                      查看全部
+                    </el-button>
                   </div>
-                </div>
-              </el-card>
-            </el-col>
-          </el-row>
+                  <div class="responsive-table">
+                    <el-table :data="recentSubmissions" style="width: 100%">
+                      <el-table-column prop="id" label="ID" width="60" :show-overflow-tooltip="true"></el-table-column>
+                      <el-table-column prop="problemTitle" label="题目" min-width="120" :show-overflow-tooltip="true"></el-table-column>
+                      <el-table-column prop="user" label="用户" width="100" :show-overflow-tooltip="true"></el-table-column>
+                      <el-table-column prop="status" label="状态" width="100" :show-overflow-tooltip="true">
+                        <template slot-scope="scope">
+                          <el-tag :type="getStatusType(scope.row.status)" size="mini">
+                            {{ scope.row.status }}
+                          </el-tag>
+                        </template>
+                      </el-table-column>
+                      <el-table-column prop="time" label="时间" width="160" :show-overflow-tooltip="true"></el-table-column>
+                    </el-table>
+                  </div>
+                </el-card>
+              </el-col>
+              
+              <el-col :xs="24" :sm="24" :md="24" :lg="8" :xl="8">
+                <el-card>
+                  <div slot="header" class="card-header">
+                    <span>系统通知</span>
+                    <el-button style="padding: 3px 0" type="text" @click="handleSelect('notifications')">
+                      查看全部
+                    </el-button>
+                  </div>
+                  <div class="notification-list">
+                    <div v-for="(notification, index) in notifications" :key="index" class="notification-item">
+                      <div class="notification-title">
+                        <i :class="notification.icon" :style="{ color: notification.color }"></i>
+                        <span>{{ notification.title }}</span>
+                      </div>
+                      <div class="notification-time">{{ notification.time }}</div>
+                      <div class="notification-content">{{ notification.content }}</div>
+                    </div>
+                    <div v-if="notifications.length === 0" class="empty-data">
+                      暂无通知
+                    </div>
+                  </div>
+                </el-card>
+              </el-col>
+            </el-row>
+          </div>
         </el-main>
       </el-container>
     </el-container>
@@ -137,8 +169,42 @@
 <script>
 import { getUserInfo, logout } from '@/api/user'
 
+// 懒加载管理组件
+const AdminProblemList = () => import('@/views/admin/problems/ProblemList.vue')
+const ProblemEdit = () => import('@/views/admin/problems/ProblemEdit.vue')
+const TestCaseManager = () => import('@/views/admin/problems/TestCaseManager.vue')
+
+// 用户管理组件可能需要创建
+const UserManagement = {
+  template: '<div><h2>用户管理页面</h2><p>此功能正在开发中...</p></div>'
+}
+
+// 提交记录组件可能需要创建
+const SubmissionManagement = {
+  template: '<div><h2>提交记录管理页面</h2><p>此功能正在开发中...</p></div>'
+}
+
+// 系统设置组件可能需要创建
+const SystemSettings = {
+  template: '<div><h2>系统设置页面</h2><p>此功能正在开发中...</p></div>'
+}
+
+// 通知组件可能需要创建
+const Notifications = {
+  template: '<div><h2>系统通知页面</h2><p>此功能正在开发中...</p></div>'
+}
+
 export default {
   name: 'Home',
+  components: {
+    AdminProblemList,
+    ProblemEdit,
+    TestCaseManager,
+    UserManagement,
+    SubmissionManagement,
+    SystemSettings,
+    Notifications
+  },
   data() {
     return {
       username: '',
@@ -146,6 +212,9 @@ export default {
       role: 2, // 默认管理员角色
       roleName: '管理员',
       isCollapse: window.innerWidth < 768,
+      activeMenu: 'dashboard',
+      currentComponent: null,
+      componentParams: {},
       avatarUrl: 'https://cube.elemecdn.com/0/88/03b0d39583f48206768a7534e55bcpng.png',
       
       // 仪表板卡片数据
@@ -258,6 +327,15 @@ export default {
     window.addEventListener('resize', this.handleResize)
     
     this.fetchUserInfo()
+    
+    // 检查是否有查询参数，优先处理查询参数
+    const queryParams = this.$route.query
+    if (queryParams.component) {
+      this.handleComponentNavigation(queryParams)
+    } else {
+      // 如果没有查询参数，则根据URL路径设置初始活动菜单
+      this.initActiveMenuFromPath()
+    }
   },
   beforeDestroy() {
     // 组件销毁前移除事件监听
@@ -344,11 +422,141 @@ export default {
       };
       return statusMap[status] || 'info';
     },
-    viewAllSubmissions() {
-      this.$router.push('/submissions');
+    handleSelect(key) {
+      this.activeMenu = key;
+      
+      switch (key) {
+        case 'dashboard':
+          this.$router.push('/admin');
+          break;
+        case 'problem-list':
+          this.$router.push('/admin/problems');
+          break;
+        case 'problem-create':
+          this.$router.push('/admin/problems/create');
+          break;
+        case 'user-management':
+          this.$router.push('/admin/users');
+          break;
+        case 'submission-management':
+          this.$router.push('/admin/submissions');
+          break;
+        case 'system-settings':
+          this.$router.push('/admin/settings');
+          break;
+        default:
+          this.$router.push('/admin');
+      }
     },
-    viewAllNotifications() {
-      this.$router.push('/notifications');
+    
+    editProblem(id) {
+      this.currentComponent = 'ProblemEdit';
+      this.componentParams = { id, isCreate: false };
+      this.activeMenu = 'problem-edit';
+      
+      // 更新浏览器历史，使用 router.push 替代 window.history.pushState
+      this.$router.push({
+        path: `/admin/problems/edit/${id}`,
+        query: { fromAdmin: true } // 添加标记，表示这是从管理界面发起的导航
+      }).catch(err => {
+        // 忽略导航重复错误
+        if (err.name !== 'NavigationDuplicated') {
+          throw err;
+        }
+      });
+    },
+    
+    manageProblemTestCases(id) {
+      // 设置当前组件为TestCaseManager
+      this.currentComponent = 'TestCaseManager';
+      this.componentParams = { id };
+      this.activeMenu = 'problem-testcases';
+      
+      // 更新浏览器历史，使用 router.push 替代 window.history.pushState
+      this.$router.push({
+        path: `/admin/problems/testcases/${id}`,
+        query: { fromAdmin: true } // 添加标记，表示这是从管理界面发起的导航
+      }).catch(err => {
+        // 忽略导航重复错误
+        if (err.name !== 'NavigationDuplicated') {
+          throw err;
+        }
+      });
+      
+      // 确保组件会重新渲染
+      this.$nextTick(() => {
+        console.log('准备加载测试用例管理组件，ID:', id);
+        // 如果需要，可以在这里添加额外的处理逻辑
+      });
+    },
+    
+    initActiveMenuFromPath() {
+      const path = window.location.pathname;
+      
+      if (path.includes('/admin/problems/edit')) {
+        const id = parseInt(path.split('/').pop());
+        if (!isNaN(id)) {
+          this.editProblem(id);
+        }
+      } else if (path.includes('/admin/problems/create')) {
+        this.handleSelect('problem-create');
+      } else if (path.includes('/admin/problems/testcases')) {
+        const id = parseInt(path.split('/').pop());
+        if (!isNaN(id)) {
+          this.manageProblemTestCases(id);
+        }
+      } else if (path.includes('/admin/problems')) {
+        this.handleSelect('problem-list');
+      } else if (path.includes('/admin/users')) {
+        this.handleSelect('user-management');
+      } else if (path.includes('/admin/submissions')) {
+        this.handleSelect('submission-management');
+      } else if (path.includes('/admin/settings')) {
+        this.handleSelect('system-settings');
+      } else {
+        this.handleSelect('dashboard');
+      }
+    },
+    
+    // 处理URL查询参数导航
+    handleComponentNavigation(params) {
+      const component = params.component
+      
+      switch (component) {
+        case 'problem-detail':
+          if (params.problemId) {
+            const problemId = parseInt(params.problemId)
+            this.currentComponent = 'ProblemEdit'
+            this.componentParams = { id: problemId, isCreate: false }
+            this.activeMenu = 'problem-edit'
+            
+            // 更新URL（可选，但建议添加，以支持刷新和分享）
+            this.$router.replace({
+              path: this.$route.path,
+              query: { component, problemId }
+            }).catch(err => {
+              // 忽略导航重复错误
+              if (err.name !== 'NavigationDuplicated') {
+                throw err;
+              }
+            });
+          } else {
+            this.handleSelect('problem-list')
+          }
+          break
+        case 'problems':
+          this.handleSelect('problem-list')
+          break
+        case 'submissions':
+          this.handleSelect('submission-management')
+          break
+        case 'leaderboard': // 如果需要添加排行榜组件
+          // TODO: 添加排行榜组件处理
+          this.handleSelect('dashboard')
+          break
+        default:
+          this.handleSelect('dashboard')
+      }
     }
   }
 }
