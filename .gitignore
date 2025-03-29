@@ -1,0 +1,91 @@
+# 后端C++相关忽略项
+# 编译输出
+/backend/build/
+/backend/bin/
+/backend/lib/
+/backend/obj/
+/backend/out/
+/backend/cmake-build-*/
+
+# 依赖库
+/backend/vendor/
+
+# 编译中间文件
+*.o
+*.obj
+*.lo
+*.la
+*.a
+*.so
+*.dll
+*.dylib
+*.exe
+*.out
+*.app
+
+# CMake生成的文件
+CMakeCache.txt
+CMakeFiles
+CMakeScripts
+Testing
+Makefile
+cmake_install.cmake
+install_manifest.txt
+compile_commands.json
+CTestTestfile.cmake
+build.ninja
+.ninja_deps
+.ninja_log
+
+# 前端相关忽略项
+# Node模块
+/frontend/node_modules/
+
+# 构建输出
+/frontend/dist/
+/frontend/dist-ssr/
+/frontend/.vite/
+
+# 本地配置文件
+/frontend/.env.local
+/frontend/.env.*.local
+
+# 日志文件
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# 编辑器目录和文件
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.DS_Store
+*.local
+
+# 测试覆盖率
+/frontend/coverage/
+
+# 其他
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.cache
+.temp
+.thumbs
+
+# 数据库文件
+*.db
+*.sqlite
+*.sqlite3
+
+# 日志文件
+logs/
+*.log 
