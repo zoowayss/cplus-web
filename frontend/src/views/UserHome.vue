@@ -2,7 +2,10 @@
   <div class="home-container">
     <el-container>
       <el-header>
-        <div class="header-logo">在线评测系统</div>
+        <div class="header-left">
+          <i class="el-icon-s-fold toggle-menu" @click="isCollapse = !isCollapse"></i>
+          <div class="header-logo">在线评测系统</div>
+        </div>
         <div class="header-right">
           <el-dropdown trigger="click" @command="handleCommand">
             <span class="el-dropdown-link">
@@ -19,12 +22,13 @@
       </el-header>
       
       <el-container>
-        <el-aside width="200px">
+        <el-aside :width="isCollapse ? '64px' : '200px'">
           <el-menu
             default-active="1"
             class="el-menu-vertical"
             background-color="#545c64"
             text-color="#fff"
+            :collapse="isCollapse"
             active-text-color="#ffd04b">
             <el-menu-item index="1">
               <i class="el-icon-s-home"></i>
@@ -61,7 +65,7 @@
           </el-row>
           
           <el-row :gutter="20" class="card-row">
-            <el-col :span="12">
+            <el-col :xs="24" :sm="24" :md="12" :lg="12" :xl="12">
               <el-card shadow="hover">
                 <div slot="header">
                   <i class="el-icon-user"></i>
@@ -74,7 +78,7 @@
                 </div>
               </el-card>
             </el-col>
-            <el-col :span="12">
+            <el-col :xs="24" :sm="24" :md="12" :lg="12" :xl="12">
               <el-card shadow="hover">
                 <div slot="header">
                   <i class="el-icon-data-analysis"></i>
@@ -92,31 +96,33 @@
           <el-row :gutter="20" class="card-row">
             <el-col :span="24">
               <el-card>
-                <div slot="header">
+                <div slot="header" class="card-header">
                   <span>推荐题目</span>
                   <el-button style="float: right; padding: 3px 0" type="text" @click="viewAllProblems">
                     查看全部
                   </el-button>
                 </div>
-                <el-table :data="recommendedProblems" style="width: 100%">
-                  <el-table-column prop="id" label="ID" width="80"></el-table-column>
-                  <el-table-column prop="title" label="题目" min-width="180"></el-table-column>
-                  <el-table-column prop="difficulty" label="难度" width="100">
-                    <template slot-scope="scope">
-                      <el-tag :type="getDifficultyType(scope.row.difficulty)">
-                        {{ scope.row.difficulty }}
-                      </el-tag>
-                    </template>
-                  </el-table-column>
-                  <el-table-column prop="acceptance" label="通过率" width="100"></el-table-column>
-                  <el-table-column label="操作" width="120">
-                    <template slot-scope="scope">
-                      <el-button type="text" size="small" @click="goToProblem(scope.row.id)">
-                        查看详情
-                      </el-button>
-                    </template>
-                  </el-table-column>
-                </el-table>
+                <div class="responsive-table">
+                  <el-table :data="recommendedProblems" style="width: 100%">
+                    <el-table-column prop="id" label="ID" width="60"></el-table-column>
+                    <el-table-column prop="title" label="题目" min-width="180"></el-table-column>
+                    <el-table-column prop="difficulty" label="难度" width="100" :show-overflow-tooltip="true">
+                      <template slot-scope="scope">
+                        <el-tag :type="getDifficultyType(scope.row.difficulty)" size="mini">
+                          {{ scope.row.difficulty }}
+                        </el-tag>
+                      </template>
+                    </el-table-column>
+                    <el-table-column prop="acceptance" label="通过率" width="80" :show-overflow-tooltip="true"></el-table-column>
+                    <el-table-column label="操作" width="80" :show-overflow-tooltip="true">
+                      <template slot-scope="scope">
+                        <el-button type="text" size="mini" @click="goToProblem(scope.row.id)">
+                          详情
+                        </el-button>
+                      </template>
+                    </el-table-column>
+                  </el-table>
+                </div>
               </el-card>
             </el-col>
           </el-row>
@@ -137,17 +143,43 @@ export default {
       email: '',
       role: 0, // 0: 学生, 1: 教师, 2: 管理员
       avatarUrl: 'https://cube.elemecdn.com/0/88/03b0d39583f48206768a7534e55bcpng.png',
+      isCollapse: window.innerWidth < 768,
       stats: {
-        totalProblems: 0,
-        totalSubmissions: 0,
-        solvedProblems: 0
+        totalProblems: 320,
+        totalSubmissions: 47,
+        solvedProblems: 23
       },
       recommendedProblems: [
-        { id: 1, title: '两数之和', difficulty: '简单', acceptance: '75%' },
-        { id: 2, title: '链表反转', difficulty: '中等', acceptance: '62%' },
-        { id: 3, title: '最长回文子串', difficulty: '中等', acceptance: '45%' },
-        { id: 4, title: '合并区间', difficulty: '中等', acceptance: '40%' },
-        { id: 5, title: '最小路径和', difficulty: '困难', acceptance: '32%' }
+        {
+          id: 1,
+          title: '两数之和',
+          difficulty: '简单',
+          acceptance: '85%'
+        },
+        {
+          id: 2,
+          title: '三数之和',
+          difficulty: '中等',
+          acceptance: '65%'
+        },
+        {
+          id: 3,
+          title: '链表反转',
+          difficulty: '简单',
+          acceptance: '78%'
+        },
+        {
+          id: 4,
+          title: '二叉树遍历',
+          difficulty: '中等',
+          acceptance: '70%'
+        },
+        {
+          id: 5,
+          title: '动态规划基础',
+          difficulty: '困难',
+          acceptance: '45%'
+        }
       ]
     }
   },
@@ -164,7 +196,15 @@ export default {
       this.$router.push('/login')
       return
     }
+    
+    // 监听窗口大小变化，调整菜单折叠状态
+    window.addEventListener('resize', this.handleResize)
+    
     this.fetchUserInfo()
+  },
+  beforeDestroy() {
+    // 组件销毁前移除事件监听
+    window.removeEventListener('resize', this.handleResize)
   },
   methods: {
     fetchUserInfo() {
@@ -258,10 +298,14 @@ export default {
       return types[difficulty] || 'info'
     },
     viewAllProblems() {
-      this.$message.info('题目列表功能开发中')
+      this.$router.push('/problems')
     },
     goToProblem(id) {
-      this.$message.info(`题目详情功能开发中，题目ID: ${id}`)
+      this.$router.push(`/problems/${id}`)
+    },
+    handleResize() {
+      // 窗口宽度小于768px时折叠菜单
+      this.isCollapse = window.innerWidth < 768
     }
   }
 }
@@ -270,6 +314,8 @@ export default {
 <style lang="scss" scoped>
 .home-container {
   height: 100vh;
+  display: flex;
+  overflow: hidden;
   
   .el-header {
     background-color: #409EFF;
@@ -278,10 +324,32 @@ export default {
     align-items: center;
     justify-content: space-between;
     padding: 0 20px;
+    height: 60px !important;
     
-    .header-logo {
-      font-size: 20px;
-      font-weight: bold;
+    .header-left {
+      display: flex;
+      align-items: center;
+      
+      .toggle-menu {
+        font-size: 20px;
+        margin-right: 15px;
+        cursor: pointer;
+        transition: transform 0.3s;
+        
+        &:hover {
+          transform: scale(1.1);
+        }
+      }
+      
+      .header-logo {
+        font-size: 20px;
+        font-weight: bold;
+        white-space: nowrap;
+        
+        @media screen and (max-width: 576px) {
+          font-size: 16px;
+        }
+      }
     }
     
     .header-right {
@@ -301,6 +369,12 @@ export default {
   .el-aside {
     background-color: #545c64;
     color: #fff;
+    transition: width 0.3s;
+    overflow: hidden;
+    
+    @media screen and (max-width: 768px) {
+      width: 64px !important;
+    }
     
     .el-menu {
       border-right: none;
@@ -312,6 +386,10 @@ export default {
     padding: 20px;
     overflow: auto;
     
+    @media screen and (max-width: 768px) {
+      padding: 10px;
+    }
+    
     .welcome-card {
       margin-bottom: 20px;
       
@@ -321,6 +399,15 @@ export default {
         
         h1 {
           margin-top: 0;
+          font-size: calc(1.2rem + 1vw);
+        }
+        
+        p {
+          font-size: 14px;
+          
+          @media screen and (max-width: 576px) {
+            font-size: 12px;
+          }
         }
       }
     }
@@ -328,12 +415,83 @@ export default {
     .card-row {
       margin-top: 20px;
       
+      @media screen and (max-width: 576px) {
+        margin-top: 10px;
+      }
+      
+      .el-col {
+        margin-bottom: 20px;
+        
+        @media screen and (max-width: 576px) {
+          margin-bottom: 10px;
+        }
+      }
+      
       .card-item {
         p {
           margin: 10px 0;
+          
+          @media screen and (max-width: 576px) {
+            margin: 5px 0;
+            font-size: 12px;
+          }
         }
       }
     }
+    
+    .el-table {
+      @media screen and (max-width: 576px) {
+        font-size: 12px;
+      }
+    }
+  }
+  
+  // 使el-container自适应高度
+  .el-container {
+    height: 100%;
+    width: 100%;
+    
+    &:nth-child(2) {
+      overflow: hidden;
+    }
+  }
+}
+
+// 增加媒体查询，处理小屏幕设备的布局调整
+@media screen and (max-width: 768px) {
+  .el-col-12 {
+    width: 100%;
+  }
+  
+  .el-menu-item span {
+    display: none;
+  }
+  
+  .welcome-card .welcome-content h1 {
+    font-size: 18px;
+  }
+}
+
+.responsive-table {
+  overflow-x: auto;
+  
+  .el-table {
+    width: 100%;
+    
+    @media screen and (max-width: 576px) {
+      font-size: 12px;
+    }
+  }
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  
+  @media screen and (max-width: 576px) {
+    font-size: 14px;
   }
 }
 </style> 
