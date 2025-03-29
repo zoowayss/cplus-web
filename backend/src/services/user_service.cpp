@@ -14,23 +14,8 @@ bool UserService::validatePassword(const std::string& password) {
         return false;
     }
     
-    // 密码复杂度检查（例如必须包含字母和数字）
-    bool has_letter = false;
-    bool has_digit = false;
-    
-    for (char c : password) {
-        if (isalpha(c)) {
-            has_letter = true;
-        } else if (isdigit(c)) {
-            has_digit = true;
-        }
-        
-        if (has_letter && has_digit) {
-            break;
-        }
-    }
-    
-    return has_letter && has_digit;
+    // 不再要求必须包含字母和数字
+    return true;
 }
 
 // 验证用户名格式
@@ -98,7 +83,7 @@ bool UserService::registerUser(const std::string& username, const std::string& p
     }
     
     if (!validatePassword(password)) {
-        error_message = "密码强度不够，密码必须至少6位，且包含字母和数字";
+        error_message = "密码长度不能少于6位";
         return false;
     }
     
@@ -305,7 +290,7 @@ bool UserService::changePassword(int user_id, const std::string& old_password,
                                const std::string& new_password, std::string& error_message) {
     // 验证新密码强度
     if (!validatePassword(new_password)) {
-        error_message = "新密码强度不够，密码必须至少6位，且包含字母和数字";
+        error_message = "新密码长度不能少于6位";
         return false;
     }
     

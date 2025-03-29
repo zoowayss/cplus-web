@@ -17,6 +17,7 @@ std::string JWT::secret_key = "cplus_web_secret_key_for_jwt_token";
 // Base64编码
 std::string JWT::base64_encode(const std::string& data) {
     BIO* b64 = BIO_new(BIO_f_base64());
+    BIO_set_flags(b64, BIO_FLAGS_BASE64_NO_NL); // 禁止添加换行符
     BIO* bmem = BIO_new(BIO_s_mem());
     b64 = BIO_push(b64, bmem);
     BIO_write(b64, data.c_str(), data.length());
@@ -25,7 +26,7 @@ std::string JWT::base64_encode(const std::string& data) {
     BUF_MEM* bptr;
     BIO_get_mem_ptr(b64, &bptr);
     
-    std::string result(bptr->data, bptr->length - 1); // 减1是为了去掉换行符
+    std::string result(bptr->data, bptr->length); // 不再需要减1，因为没有换行符
     BIO_free_all(b64);
     
     // 替换URL安全的Base64字符
@@ -53,6 +54,7 @@ std::string JWT::base64_decode(const std::string& data) {
     }
     
     BIO* b64 = BIO_new(BIO_f_base64());
+    BIO_set_flags(b64, BIO_FLAGS_BASE64_NO_NL); // 禁止换行符检查
     BIO* bmem = BIO_new_mem_buf(base64.c_str(), base64.length());
     bmem = BIO_push(b64, bmem);
     

@@ -57,6 +57,14 @@ namespace http {
             set_header("Content-Type", type);
         }
         
+        // 设置CORS头部函数，允许跨域请求
+        void set_cors_headers() {
+            set_header("Access-Control-Allow-Origin", "*");
+            set_header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+            set_header("Access-Control-Allow-Headers", "Content-Type, Authorization");
+            set_header("Access-Control-Max-Age", "3600"); // 缓存预检请求结果1小时
+        }
+        
         // 设置为JSON响应
         void json(const std::string& json_str) {
             body = json_str;
@@ -150,25 +158,35 @@ namespace http {
                 // 设置默认响应头
                 response.set_header("Server", "C++ Simple HTTP Server");
                 response.set_header("Connection", "close");
+                // 为所有响应添加CORS头部
+                response.set_cors_headers();
                 
-                // 查找匹配的路由处理器
-                auto method_it = routes_.find(request.method);
-                if (method_it != routes_.end()) {
-                    auto route_it = method_it->second.find(request.path);
-                    if (route_it != method_it->second.end()) {
-                        // 调用处理器
-                        route_it->second(request, response);
-                    } else {
-                        // 路径不存在
-                        response.status_code = 404;
-                        response.status_message = "Not Found";
-                        response.json("{\"error\": \"Resource not found\"}");
-                    }
+                // 特殊处理OPTIONS预检请求
+                if (request.method == "OPTIONS") {
+                    // 对于预检请求，直接返回200 OK，不需要调用路由处理器
+                    response.status_code = 200;
+                    response.status_message = "OK";
+                    response.body = "";
                 } else {
-                    // 方法不支持
-                    response.status_code = 405;
-                    response.status_message = "Method Not Allowed";
-                    response.json("{\"error\": \"Method not allowed\"}");
+                    // 查找匹配的路由处理器
+                    auto method_it = routes_.find(request.method);
+                    if (method_it != routes_.end()) {
+                        auto route_it = method_it->second.find(request.path);
+                        if (route_it != method_it->second.end()) {
+                            // 调用处理器
+                            route_it->second(request, response);
+                        } else {
+                            // 路径不存在
+                            response.status_code = 404;
+                            response.status_message = "Not Found";
+                            response.json("{\"error\": \"Resource not found\"}");
+                        }
+                    } else {
+                        // 方法不支持
+                        response.status_code = 405;
+                        response.status_message = "Method Not Allowed";
+                        response.json("{\"error\": \"Method not allowed\"}");
+                    }
                 }
                 
                 // 发送响应

@@ -5,6 +5,7 @@
 #include "../utils/jwt.h"
 #include <string>
 #include <functional>
+#include <json/json.h>
 
 namespace middleware {
     
@@ -18,7 +19,11 @@ namespace middleware {
             if (auth_header.empty() || auth_header.substr(0, 7) != "Bearer ") {
                 res.status_code = 401;
                 res.status_message = "Unauthorized";
-                res.json("{\"status\": \"error\", \"message\": \"未提供有效的认证令牌\"}");
+                
+                Json::Value response;
+                response["status"] = "error";
+                response["message"] = "未提供有效的认证令牌";
+                res.json(Json::writeString(Json::StreamWriterBuilder(), response));
                 return false;
             }
             
@@ -30,7 +35,11 @@ namespace middleware {
             if (!JWT::verifyToken(token, payload)) {
                 res.status_code = 401;
                 res.status_message = "Unauthorized";
-                res.json("{\"status\": \"error\", \"message\": \"认证令牌无效或已过期\"}");
+                
+                Json::Value response;
+                response["status"] = "error";
+                response["message"] = "认证令牌无效或已过期";
+                res.json(Json::writeString(Json::StreamWriterBuilder(), response));
                 return false;
             }
             
@@ -54,7 +63,11 @@ namespace middleware {
             if (role < required_role) {
                 res.status_code = 403;
                 res.status_message = "Forbidden";
-                res.json("{\"status\": \"error\", \"message\": \"没有足够权限执行此操作\"}");
+                
+                Json::Value response;
+                response["status"] = "error";
+                response["message"] = "没有足够权限执行此操作";
+                res.json(Json::writeString(Json::StreamWriterBuilder(), response));
                 return false;
             }
             
