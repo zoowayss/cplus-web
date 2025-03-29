@@ -5,6 +5,7 @@
 #include "user_controller.h"
 #include "system_controller.h"
 #include "problem_controller.h"
+#include "discussion_controller.h"
 #include <vector>
 #include <memory>
 

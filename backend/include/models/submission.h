@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 #include <ctime>
+#include <json/json.h>
 
 // 编程语言枚举
 enum class Language {
@@ -67,8 +68,8 @@ public:
     // 从JSON字符串加载测试点结果
     static TestPointResult fromJson(const std::string& json);
     
-    // 转换为JSON字符串
-    std::string toJson() const;
+    // 转换为JSON对象
+    Json::Value toJson() const;
 };
 
 // 提交记录类
@@ -87,6 +88,10 @@ private:
     std::time_t created_at;        // 创建时间
     std::time_t judged_at;         // 评测时间
     std::vector<TestPointResult> test_results; // 测试点结果
+    
+    // 扩展字段（非数据库字段，仅用于显示）
+    std::string username;          // 用户名
+    std::string problem_title;     // 题目标题
 
 public:
     // 构造函数
@@ -108,12 +113,28 @@ public:
     std::time_t getJudgedAt() const;
     std::vector<TestPointResult> getTestResults() const;
     
+    // 扩展字段Getters
+    std::string getUsername() const { return username; }
+    std::string getProblemTitle() const { return problem_title; }
+    
+    // 将Language枚举转换为字符串
+    std::string getLanguageStr() const;
+    
+    // 将字符串转换为Language枚举
+    static Language convertStringToLanguage(const std::string& langStr);
+    
     // Setters
     void setId(int id);
     void setUserId(int user_id);
     void setProblemId(int problem_id);
     void setSourceCode(const std::string& source_code);
     void setLanguage(Language language);
+    
+    // 添加一个接受字符串的setLanguage重载
+    void setLanguage(const std::string& languageStr) { 
+        this->language = convertStringToLanguage(languageStr); 
+    }
+    
     void setResult(JudgeResult result);
     void setScore(int score);
     void setTimeUsed(int time_used);
@@ -122,6 +143,10 @@ public:
     void setCreatedAt(std::time_t created_at);
     void setJudgedAt(std::time_t judged_at);
     void setTestResults(const std::vector<TestPointResult>& test_results);
+    
+    // 扩展字段Setters
+    void setUsername(const std::string& username) { this->username = username; }
+    void setProblemTitle(const std::string& problem_title) { this->problem_title = problem_title; }
     
     // 添加测试点结果
     void addTestResult(const TestPointResult& test_result);
@@ -132,8 +157,8 @@ public:
     // 从JSON字符串加载提交记录
     static Submission fromJson(const std::string& json);
     
-    // 转换为JSON字符串
-    std::string toJson() const;
+    // 转换为JSON对象
+    Json::Value toJson(bool complete = false) const;
 };
 
 // 提交记录数据访问对象，处理提交记录相关的数据库操作

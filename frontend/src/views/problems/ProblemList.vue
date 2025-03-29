@@ -78,32 +78,14 @@
         />
       </div>
     </el-card>
-    
-    <!-- 题目详情弹窗 -->
-    <el-dialog
-      :title="currentProblem.title || '题目详情'"
-      :visible.sync="dialogVisible"
-      width="80%"
-      :fullscreen="isMobile"
-      :before-close="handleDialogClose">
-      <problem-detail 
-        v-if="dialogVisible" 
-        :params="{ problemId: currentProblem.id }" 
-        :isDialogMode="true"
-        @close="dialogVisible = false" />
-    </el-dialog>
   </div>
 </template>
 
 <script>
 import { getProblems } from '@/api/problem';
-import ProblemDetail from './ProblemDetail.vue';
 
 export default {
   name: 'ProblemList',
-  components: {
-    ProblemDetail
-  },
   data() {
     return {
       loading: false,
@@ -119,26 +101,12 @@ export default {
         2: 'attempted',
         3: 'accepted'
       },
-      // 弹窗相关
-      dialogVisible: false,
-      currentProblem: {},
-      isMobile: false
     };
   },
   created() {
     this.fetchProblems();
-    this.checkIsMobile();
-    window.addEventListener('resize', this.checkIsMobile);
-  },
-  beforeDestroy() {
-    window.removeEventListener('resize', this.checkIsMobile);
   },
   methods: {
-    // 检查是否为移动设备
-    checkIsMobile() {
-      this.isMobile = window.innerWidth <= 768;
-    },
-    
     // 获取题目列表
     fetchProblems() {
       this.loading = true;
@@ -201,14 +169,18 @@ export default {
     
     // 查看题目 - 打开弹窗
     viewProblem(problem) {
-      this.currentProblem = problem;
-      this.dialogVisible = true;
-    },
-    
-    // 关闭弹窗
-    handleDialogClose() {
-      this.dialogVisible = false;
-      this.currentProblem = {};
+      console.log('查看题目，ID:', problem.id);
+      
+      // 检查是否在用户主页或管理员主页环境下
+      if (this.$parent && typeof this.$parent.viewProblem === 'function') {
+        // 如果在主页环境中且父组件提供了viewProblem方法，使用父组件方法
+        console.log('使用父组件方法查看题目');
+        this.$parent.viewProblem(problem.id);
+      } else {
+        // 否则直接导航到题目详情页
+        console.log('导航到题目详情页');
+        this.$router.push(`/problems/${problem.id}`);
+      }
     },
     
     // 根据难度返回不同的标签类型

@@ -22,6 +22,9 @@ public:
     // 获取用户在特定题目的提交列表
     static std::vector<Submission> getUserProblemSubmissions(int user_id, int problem_id, int offset = 0, int limit = 10);
     
+    // 获取题目的提交记录总数（可以根据用户角色筛选）
+    static int getProblemSubmissionsCount(int problem_id, int user_id, bool is_admin = false);
+    
     // 获取所有提交列表（管理员用）
     static std::vector<Submission> getAllSubmissions(int offset = 0, int limit = 10);
     

@@ -46,6 +46,18 @@ private:
     // 提交代码处理
     void handleSubmitCode(const http::Request& req, http::Response& res);
     
+    // 获取题目的提交记录
+    void handleGetProblemSubmissions(const http::Request& req, http::Response& res);
+    
+    // 获取所有提交记录
+    void handleGetAllSubmissions(const http::Request& req, http::Response& res);
+    
+    // 获取单个提交详情
+    void handleGetSubmissionDetail(const http::Request& req, http::Response& res);
+    
+    // 重新提交代码
+    void handleResubmitCode(const http::Request& req, http::Response& res);
+    
     // 从路径参数中获取ID
     int getIdFromPath(const std::string& path, const std::string& prefix);
 };

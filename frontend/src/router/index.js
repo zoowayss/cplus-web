@@ -121,6 +121,13 @@ const routes = [
     component: () => import('../views/problems/ProblemDetail.vue'),
     meta: { title: '题目详情', requiresAuth: true }
   },
+  // // 讨论相关路由
+  // {
+  //   path: '/discussions/:id',
+  //   name: 'DiscussionDetail',
+  //   component: () => import('../views/discussions/DiscussionDetail.vue'),
+  //   meta: { title: '讨论详情', requiresAuth: true }
+  // },
   // 提交记录相关路由
   {
     path: '/submissions',

@@ -149,8 +149,7 @@ import { getUserInfo, logout } from '@/api/user'
 // 懒加载组件
 const ProblemList = () => import('@/views/problems/ProblemList.vue')
 const ProblemDetail = () => import('@/views/problems/ProblemDetail.vue')
-const SubmissionList = () => import('@/views/submissions/SubmissionList.vue')
-const SubmissionDetail = () => import('@/views/submissions/SubmissionDetail.vue')
+const SubmissionList = () => import('@/views/problems/SubmissionList.vue')
 const Leaderboard = () => import('@/views/leaderboard/Leaderboard.vue')
 
 export default {
@@ -159,7 +158,6 @@ export default {
     ProblemList,
     ProblemDetail,
     SubmissionList,
-    SubmissionDetail,
     Leaderboard
   },
   data() {
@@ -200,6 +198,17 @@ export default {
     if (queryParams.component) {
       this.handleComponentNavigation(queryParams)
     }
+  },
+  mounted() {
+    // 监听URL查询参数变化，实时更新组件
+    this.$watch(
+      '$route.query', 
+      (newQuery) => {
+        if (newQuery.component) {
+          this.handleComponentNavigation(newQuery)
+        }
+      }
+    )
   },
   beforeDestroy() {
     window.removeEventListener('resize', this.handleResize)
@@ -270,7 +279,7 @@ export default {
     },
     // 跳转到提交详情页
     viewSubmission(submissionId) {
-      this.currentComponent = 'SubmissionDetail'
+      this.currentComponent = 'SubmissionList'
       this.componentParams = { submissionId }
       this.activeMenu = 'submissions' // 高亮提交菜单
       
@@ -278,7 +287,7 @@ export default {
       this.$router.replace({ 
         path: this.$route.path,
         query: { 
-          component: 'submission-detail', 
+          component: 'submissions', 
           submissionId 
         }
       })

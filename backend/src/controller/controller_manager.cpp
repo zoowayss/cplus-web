@@ -5,6 +5,7 @@ ControllerManager::ControllerManager() {
     controllers.push_back(std::make_unique<UserController>());
     controllers.push_back(std::make_unique<SystemController>());
     controllers.push_back(std::make_unique<ProblemController>());
+    controllers.push_back(std::make_unique<DiscussionController>());
 }
 
 ControllerManager::~ControllerManager() = default;

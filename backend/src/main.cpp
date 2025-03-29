@@ -119,6 +119,113 @@ int main(int argc, char** argv) {
         std::cout << "测试用例表已就绪" << std::endl;
     }
     
+    // 创建提交记录表
+    std::string create_submissions_table = 
+        "CREATE TABLE IF NOT EXISTS submissions ("
+        "id INT AUTO_INCREMENT PRIMARY KEY,"
+        "user_id INT NOT NULL,"
+        "problem_id INT NOT NULL,"
+        "language VARCHAR(10) NOT NULL," // cpp, java, python等
+        "source_code TEXT NOT NULL,"
+        "result INT NOT NULL DEFAULT 0," // 0-待评测, 1-评测中, 2-通过, 3-答案错误, 4-超时, 5-内存超限, 6-运行错误, 7-编译错误, 8-系统错误
+        "score INT NOT NULL DEFAULT 0,"
+        "time_used INT DEFAULT 0,"
+        "memory_used INT DEFAULT 0,"
+        "error_message TEXT,"
+        "created_at BIGINT NOT NULL,"
+        "judged_at BIGINT,"
+        "FOREIGN KEY (user_id) REFERENCES users(id),"
+        "FOREIGN KEY (problem_id) REFERENCES problems(id)"
+        ")";
+    
+    if (!db->executeCommand(create_submissions_table)) {
+        std::cerr << "创建提交记录表失败" << std::endl;
+    } else {
+        std::cout << "提交记录表已就绪" << std::endl;
+    }
+    
+    // 创建测试点结果表
+    std::string create_test_point_results_table = 
+        "CREATE TABLE IF NOT EXISTS test_point_results ("
+        "id INT AUTO_INCREMENT PRIMARY KEY,"
+        "submission_id INT NOT NULL,"
+        "test_point_id INT NOT NULL," // 对应testcases表的id
+        "result INT NOT NULL DEFAULT 0," // 同上result枚举
+        "time_used INT DEFAULT 0,"
+        "memory_used INT DEFAULT 0,"
+        "output TEXT,"
+        "FOREIGN KEY (submission_id) REFERENCES submissions(id) ON DELETE CASCADE"
+        ")";
+    
+    if (!db->executeCommand(create_test_point_results_table)) {
+        std::cerr << "创建测试点结果表失败" << std::endl;
+    } else {
+        std::cout << "测试点结果表已就绪" << std::endl;
+    }
+    
+    // 创建讨论表
+    std::string create_discussions_table = 
+        "CREATE TABLE IF NOT EXISTS discussions ("
+        "id INT AUTO_INCREMENT PRIMARY KEY,"
+        "problem_id INT,"
+        "user_id INT NOT NULL,"
+        "title VARCHAR(255) NOT NULL,"
+        "content TEXT NOT NULL,"
+        "views INT DEFAULT 0,"
+        "likes INT DEFAULT 0,"
+        "created_at BIGINT NOT NULL,"
+        "updated_at BIGINT NOT NULL,"
+        "FOREIGN KEY (problem_id) REFERENCES problems(id) ON DELETE CASCADE,"
+        "FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE"
+        ")";
+    
+    if (!db->executeCommand(create_discussions_table)) {
+        std::cerr << "创建讨论表失败" << std::endl;
+    } else {
+        std::cout << "讨论表已就绪" << std::endl;
+    }
+    
+    // 创建讨论回复表
+    std::string create_discussion_replies_table = 
+        "CREATE TABLE IF NOT EXISTS discussion_replies ("
+        "id INT AUTO_INCREMENT PRIMARY KEY,"
+        "discussion_id INT NOT NULL,"
+        "user_id INT NOT NULL,"
+        "parent_id INT DEFAULT 0,"
+        "content TEXT NOT NULL,"
+        "likes INT DEFAULT 0,"
+        "created_at BIGINT NOT NULL,"
+        "updated_at BIGINT NOT NULL,"
+        "FOREIGN KEY (discussion_id) REFERENCES discussions(id) ON DELETE CASCADE,"
+        "FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE"
+        ")";
+    
+    if (!db->executeCommand(create_discussion_replies_table)) {
+        std::cerr << "创建讨论回复表失败" << std::endl;
+    } else {
+        std::cout << "讨论回复表已就绪" << std::endl;
+    }
+    
+    // 添加讨论表索引
+    std::string create_discussions_index = 
+        "CREATE INDEX IF NOT EXISTS idx_discussions_problem_id ON discussions(problem_id)";
+    if (!db->executeCommand(create_discussions_index)) {
+        std::cerr << "创建讨论表索引失败" << std::endl;
+    }
+    
+    // 添加讨论回复表索引
+    std::string create_discussion_replies_index1 = 
+        "CREATE INDEX IF NOT EXISTS idx_discussion_replies_discussion_id ON discussion_replies(discussion_id)";
+    if (!db->executeCommand(create_discussion_replies_index1)) {
+        std::cerr << "创建讨论回复表索引1失败" << std::endl;
+    }
+    
+    std::string create_discussion_replies_index2 = 
+        "CREATE INDEX IF NOT EXISTS idx_discussion_replies_parent_id ON discussion_replies(parent_id)";
+    if (!db->executeCommand(create_discussion_replies_index2)) {
+        std::cerr << "创建讨论回复表索引2失败" << std::endl;
+    }
+    
     // 启动HTTP服务器
     if (!server->start()) {
         std::cerr << "HTTP服务器启动失败" << std::endl;

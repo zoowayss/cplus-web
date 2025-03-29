@@ -168,23 +168,55 @@ namespace http {
         bool path_matches(const std::string& path, const std::string& pattern, bool is_regex) {
             if (is_regex) {
                 // 如果是正则表达式模式，检查路径是否满足正则
-                // 注意：这里使用简单的字符串匹配，不是真正的正则表达式
-                // 实际应用中应使用regex库进行匹配
                 if (pattern.find('[') != std::string::npos) {
-                    // 数字占位符处理，例如 "/api/problems/[0-9]+"
-                    size_t start_pos = pattern.find('/');
-                    size_t end_pos = pattern.find('[');
-                    std::string prefix = pattern.substr(0, end_pos);
+                    // 数字占位符例如 "/api/problems/[0-9]+"或"/api/problems/[0-9]+/submissions"
                     
+                    // 提取模式中正则表达式前的部分作为前缀
+                    size_t pattern_regex_pos = pattern.find('[');
+                    std::string prefix = pattern.substr(0, pattern_regex_pos);
+                    
+                    // 检查路径是否以前缀开始
                     if (path.substr(0, prefix.length()) == prefix) {
-                        // 路径以模式前缀开始，视为匹配
-                        // 这是一个简化的匹配，实际应用中应更严谨
-                        return true;
+                        // 检查模式中正则表达式后是否还有部分（后缀）
+                        size_t pattern_suffix_pos = pattern.find('/', pattern_regex_pos);
+                        
+                        if (pattern_suffix_pos == std::string::npos) {
+                            // 没有后缀，如 "/api/problems/[0-9]+"
+                            // 仅需验证路径中数字部分后没有其他内容或者是查询参数
+                            size_t path_next_slash = path.find('/', prefix.length());
+                            if (path_next_slash == std::string::npos) {
+                                // 路径中数字部分后没有斜杠，匹配成功
+                                return true;
+                            } else {
+                                // 数字后有斜杠，不匹配
+                                return false;
+                            }
+                        } else {
+                            // 有后缀，如 "/api/problems/[0-9]+/submissions"
+                            // 提取模式的后缀部分
+                            std::string pattern_suffix = pattern.substr(pattern_suffix_pos);
+                            
+                            // 在路径中查找数字部分后面的第一个斜杠
+                            size_t path_next_slash = path.find('/', prefix.length());
+                            if (path_next_slash != std::string::npos) {
+                                // 提取路径的后缀部分
+                                std::string path_suffix = path.substr(path_next_slash);
+                                
+                                // 检查路径后缀是否与模式后缀匹配
+                                // 提取纯路径部分（不含查询参数）
+                                size_t query_pos = path_suffix.find('?');
+                                std::string path_suffix_without_query = 
+                                    query_pos != std::string::npos ? path_suffix.substr(0, query_pos) : path_suffix;
+                                
+                                // 路径后缀（不含查询参数）必须与模式后缀完全匹配
+                                return path_suffix_without_query == pattern_suffix;
+                            }
+                        }
                     }
                 }
                 return false;
             } else {
-                // 普通路径，直接比较
+                // 普通路径，直接比较基本路径（不含查询参数）
                 return path == pattern;
             }
         }

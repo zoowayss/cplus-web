@@ -1,4 +1,8 @@
 #include "../../include/controller/problem_controller.h"
+#include "../../include/services/submission_service.h"
+#include "../../include/models/submission.h"
+#include "../../include/models/submission_repository.h"
+#include <json/json.h>
 #include <iostream>
 #include <regex>
 #include <sstream>
@@ -81,10 +85,34 @@ void ProblemController::registerRoutes(http::HttpServer* server) {
         this->handleDeleteTestCase(req, res);
     }, 2));
     
+    // 获取题目的提交记录
+    server->get("/api/problems/[0-9]+/submissions", middleware::AuthMiddleware::protect([this](const http::Request& req, http::Response& res) {
+        res.set_cors_headers();
+        this->handleGetProblemSubmissions(req, res);
+    }));
+    
+    // 获取所有提交记录
+    server->get("/api/submissions", middleware::AuthMiddleware::protect([this](const http::Request& req, http::Response& res) {
+        res.set_cors_headers();
+        this->handleGetAllSubmissions(req, res);
+    }));
+    
     // 提交代码路由
     server->post("/api/submissions", middleware::AuthMiddleware::protect([this](const http::Request& req, http::Response& res) {
         res.set_cors_headers();
         this->handleSubmitCode(req, res);
+    }));
+    
+    // 获取单个提交详情
+    server->get("/api/submissions/[0-9]+", middleware::AuthMiddleware::protect([this](const http::Request& req, http::Response& res) {
+        res.set_cors_headers();
+        this->handleGetSubmissionDetail(req, res);
+    }));
+    
+    // 重新提交代码
+    server->post("/api/submissions/resubmit/[0-9]+", middleware::AuthMiddleware::protect([this](const http::Request& req, http::Response& res) {
+        res.set_cors_headers();
+        this->handleResubmitCode(req, res);
     }));
     
     // 添加一个通用路由来处理 /api/problems 并打印所有请求信息
@@ -493,6 +521,208 @@ void ProblemController::handleDeleteTestCase(const http::Request& req, http::Res
     }
 }
 
+// 获取题目的提交记录
+void ProblemController::handleGetProblemSubmissions(const http::Request& req, http::Response& res) {
+    // 从URL中提取题目ID
+    int problem_id = getIdFromPath(req.get_base_path(), "/api/problems/");
+    if (problem_id <= 0) {
+        sendErrorResponse(res, "无效的题目ID", 400);
+        return;
+    }
+    
+    // 从请求头获取令牌获取用户ID
+    std::string auth_header = req.get_header("Authorization");
+    if (auth_header.empty() || auth_header.length() <= 7) {
+        sendErrorResponse(res, "未授权访问", 401);
+        return;
+    }
+    
+    std::string token = auth_header.substr(7); // 去掉"Bearer "前缀
+    int user_id = JWT::getUserIdFromToken(token);
+    int user_role = JWT::getUserRoleFromToken(token);
+    
+    if (user_id <= 0) {
+        sendErrorResponse(res, "无效的用户ID", 401);
+        return;
+    }
+    
+    // 解析分页参数
+    int page = 1;
+    int limit = 10;
+    
+    // 路径可能包含查询参数
+    size_t query_pos = req.path.find('?');
+    if (query_pos != std::string::npos) {
+        std::string query_string = req.path.substr(query_pos + 1);
+        std::cout << "Query string for submissions: " << query_string << std::endl;
+        
+        auto params = parseQueryParameters(query_string);
+        
+        // 打印所有参数
+        for (const auto& param : params) {
+            std::cout << "Param: " << param.first << " = " << param.second << std::endl;
+        }
+        
+        // 解析页码参数
+        auto page_it = params.find("page");
+        if (page_it != params.end()) {
+            try {
+                page = std::stoi(page_it->second);
+                if (page < 1) page = 1;
+            } catch (std::exception& e) {
+                // 忽略无效参数
+            }
+        }
+        
+        // 解析每页数量参数
+        auto limit_it = params.find("limit");
+        if (limit_it != params.end()) {
+            try {
+                limit = std::stoi(limit_it->second);
+                if (limit < 1) limit = 10;
+                if (limit > 50) limit = 50; // 限制最大数量
+            } catch (std::exception& e) {
+                // 忽略无效参数
+            }
+        }
+    }
+    
+    int offset = (page - 1) * limit;
+    
+    // 获取提交记录
+    std::vector<Submission> submissions;
+    if (user_role >= 2) { // 管理员可以查看所有提交
+        submissions = SubmissionService::getProblemSubmissions(problem_id, offset, limit);
+    } else { // 普通用户只能查看自己的提交
+        submissions = SubmissionService::getUserProblemSubmissions(user_id, problem_id, offset, limit);
+    }
+    
+    // 转换为JSON
+    Json::Value submissionsJson(Json::arrayValue);
+    for (const auto& submission : submissions) {
+        submissionsJson.append(submission.toJson());
+    }
+    
+    Json::Value data;
+    data["submissions"] = submissionsJson;
+    data["page"] = page;
+    data["limit"] = limit;
+    data["total"] = SubmissionService::getProblemSubmissionsCount(problem_id, user_id, user_role >= 2);
+    
+    sendSuccessResponse(res, "获取提交记录成功", data);
+}
+
+// 获取所有提交记录
+void ProblemController::handleGetAllSubmissions(const http::Request& req, http::Response& res) {
+    // 从请求头获取令牌获取用户ID
+    std::string auth_header = req.get_header("Authorization");
+    if (auth_header.empty() || auth_header.length() <= 7) {
+        sendErrorResponse(res, "未授权访问", 401);
+        return;
+    }
+    
+    std::string token = auth_header.substr(7); // 去掉"Bearer "前缀
+    int user_id = JWT::getUserIdFromToken(token);
+    int user_role = JWT::getUserRoleFromToken(token);
+    
+    if (user_id <= 0) {
+        sendErrorResponse(res, "无效的用户ID", 401);
+        return;
+    }
+    
+    // 解析分页和筛选参数
+    int page = 1;
+    int limit = 10;
+    int problem_id = -1; // -1 表示所有题目
+    
+    // 路径可能包含查询参数
+    size_t query_pos = req.path.find('?');
+    if (query_pos != std::string::npos) {
+        std::string query_string = req.path.substr(query_pos + 1);
+        std::cout << "Query string for all submissions: " << query_string << std::endl;
+        
+        auto params = parseQueryParameters(query_string);
+        
+        // 打印所有参数
+        for (const auto& param : params) {
+            std::cout << "Param: " << param.first << " = " << param.second << std::endl;
+        }
+        
+        // 解析页码参数
+        auto page_it = params.find("page");
+        if (page_it != params.end()) {
+            try {
+                page = std::stoi(page_it->second);
+                if (page < 1) page = 1;
+            } catch (std::exception& e) {
+                // 忽略无效参数
+            }
+        }
+        
+        // 解析每页数量参数
+        auto limit_it = params.find("limit");
+        if (limit_it != params.end()) {
+            try {
+                limit = std::stoi(limit_it->second);
+                if (limit < 1) limit = 10;
+                if (limit > 50) limit = 50; // 限制最大数量
+            } catch (std::exception& e) {
+                // 忽略无效参数
+            }
+        }
+        
+        // 解析题目ID参数
+        auto problem_id_it = params.find("problem_id");
+        if (problem_id_it != params.end()) {
+            try {
+                problem_id = std::stoi(problem_id_it->second);
+            } catch (std::exception& e) {
+                // 忽略无效参数
+            }
+        }
+    }
+    
+    int offset = (page - 1) * limit;
+    
+    // 获取提交记录
+    std::vector<Submission> submissions;
+    int total = 0;
+    
+    if (problem_id > 0) {
+        // 如果指定了题目ID，则获取该题目的提交记录
+        if (user_role >= 2) { // 管理员可以查看所有提交
+            submissions = SubmissionService::getProblemSubmissions(problem_id, offset, limit);
+            total = SubmissionService::getProblemSubmissionsCount(problem_id, user_id, true);
+        } else { // 普通用户只能查看自己的提交
+            submissions = SubmissionService::getUserProblemSubmissions(user_id, problem_id, offset, limit);
+            total = SubmissionService::getProblemSubmissionsCount(problem_id, user_id, false);
+        }
+    } else {
+        // 否则获取所有提交记录
+        if (user_role >= 2) { // 管理员可以查看所有提交
+            submissions = SubmissionService::getAllSubmissions(offset, limit);
+            total = SubmissionRepository::getSubmissionCount();
+        } else { // 普通用户只能查看自己的提交
+            submissions = SubmissionService::getUserSubmissions(user_id, offset, limit);
+            total = SubmissionService::getUserSubmissionCount(user_id);
+        }
+    }
+    
+    // 转换为JSON
+    Json::Value submissionsJson(Json::arrayValue);
+    for (const auto& submission : submissions) {
+        submissionsJson.append(submission.toJson());
+    }
+    
+    Json::Value data;
+    data["submissions"] = submissionsJson;
+    data["page"] = page;
+    data["limit"] = limit;
+    data["total"] = total;
+    
+    sendSuccessResponse(res, "获取提交记录成功", data);
+}
+
 // 提交代码处理
 void ProblemController::handleSubmitCode(const http::Request& req, http::Response& res) {
     // 解析请求体
@@ -503,12 +733,49 @@ void ProblemController::handleSubmitCode(const http::Request& req, http::Respons
         return;
     }
     
-    // 这里应该调用代码评测服务，目前暂时返回模拟数据
-    Json::Value data;
-    data["submission_id"] = 1;
-    data["status"] = "pending";
+    // 从请求头获取令牌获取用户ID
+    std::string auth_header = req.get_header("Authorization");
+    if (auth_header.empty() || auth_header.length() <= 7) {
+        sendErrorResponse(res, "未授权访问", 401);
+        return;
+    }
     
-    sendSuccessResponse(res, "代码提交成功，正在评测", data);
+    std::string token = auth_header.substr(7); // 去掉"Bearer "前缀
+    int user_id = JWT::getUserIdFromToken(token);
+    
+    if (user_id <= 0) {
+        sendErrorResponse(res, "无效的用户ID", 401);
+        return;
+    }
+    
+    // 获取提交的题目ID、代码和语言
+    int problem_id = reqJson["problem_id"].asInt();
+    std::string code = reqJson["code"].asString();
+    std::string language_str = reqJson["language"].asString();
+    
+    // 创建提交对象
+    Submission submission(user_id, problem_id, code, Submission::convertStringToLanguage(language_str));
+    
+    // 设置初始状态
+    submission.setResult(JudgeResult::PENDING);
+    
+    // 调用提交服务保存提交记录
+    std::string error_message;
+    if (SubmissionService::createSubmission(submission, error_message)) {
+        // 构建响应
+        Json::Value data;
+        data["submission_id"] = submission.getId();
+        data["status"] = "pending";
+        
+        sendSuccessResponse(res, "代码提交成功，正在评测", data);
+        
+        // TODO: 异步调用判题系统进行评测
+        // 这里可以使用线程池或消息队列来实现异步评测
+        // 目前先使用同步方式作为示例
+        // SubmissionService::prepareSubmissionForJudge(submission.getId());
+    } else {
+        sendErrorResponse(res, "提交代码失败: " + error_message, 500);
+    }
 }
 
 // 从路径参数中获取ID
@@ -525,4 +792,102 @@ int ProblemController::getIdFromPath(const std::string& path, const std::string&
     }
     
     return -1;
+}
+
+// 获取单个提交详情
+void ProblemController::handleGetSubmissionDetail(const http::Request& req, http::Response& res) {
+    // 从URL中提取提交ID
+    int submission_id = getIdFromPath(req.path, "/api/submissions/");
+    if (submission_id <= 0) {
+        sendErrorResponse(res, "无效的提交ID", 400);
+        return;
+    }
+    
+    // 从请求头获取令牌获取用户ID
+    std::string auth_header = req.get_header("Authorization");
+    std::string token = auth_header.substr(7);
+    int user_id = JWT::getUserIdFromToken(token);
+    int user_role = JWT::getUserRoleFromToken(token);
+    
+    if (user_id <= 0) {
+        sendErrorResponse(res, "无效的用户ID", 401);
+        return;
+    }
+    
+    // 检查权限
+    if (!SubmissionService::checkSubmissionPermission(submission_id, user_id) && user_role < 2) {
+        sendErrorResponse(res, "没有权限查看此提交", 403);
+        return;
+    }
+    
+    // 获取提交详情
+    Submission submission = SubmissionService::getSubmissionInfo(submission_id, true);
+    
+    if (submission.getId() == 0) {
+        sendErrorResponse(res, "提交记录不存在", 404);
+        return;
+    }
+    
+    // 构建响应
+    Json::Value data;
+    data["submission"] = submission.toJson(true);
+    
+    sendSuccessResponse(res, "获取提交详情成功", data);
+}
+
+// 重新提交代码
+void ProblemController::handleResubmitCode(const http::Request& req, http::Response& res) {
+    // 从URL中提取提交ID
+    int submission_id = getIdFromPath(req.path, "/api/submissions/resubmit/");
+    if (submission_id <= 0) {
+        sendErrorResponse(res, "无效的提交ID", 400);
+        return;
+    }
+    
+    // 从请求头获取令牌获取用户ID
+    std::string auth_header = req.get_header("Authorization");
+    std::string token = auth_header.substr(7);
+    int user_id = JWT::getUserIdFromToken(token);
+    
+    if (user_id <= 0) {
+        sendErrorResponse(res, "无效的用户ID", 401);
+        return;
+    }
+    
+    // 检查权限
+    if (!SubmissionService::checkSubmissionPermission(submission_id, user_id)) {
+        sendErrorResponse(res, "没有权限重新提交此代码", 403);
+        return;
+    }
+    
+    // 获取原提交记录
+    Submission submission = SubmissionService::getSubmissionInfo(submission_id);
+    
+    if (submission.getId() == 0) {
+        sendErrorResponse(res, "提交记录不存在", 404);
+        return;
+    }
+    
+    // 创建新的提交记录
+    Submission newSubmission(
+        user_id,
+        submission.getProblemId(),
+        submission.getSourceCode(),
+        submission.getLanguage()
+    );
+    
+    // 保存新提交
+    std::string error_message;
+    if (SubmissionService::createSubmission(newSubmission, error_message)) {
+        // 构建响应
+        Json::Value data;
+        data["submission_id"] = newSubmission.getId();
+        data["status"] = "pending";
+        
+        sendSuccessResponse(res, "重新提交成功，正在评测", data);
+        
+        // TODO: 异步调用判题系统进行评测
+    } else {
+        sendErrorResponse(res, "重新提交失败: " + error_message, 500);
+    }
 } 
