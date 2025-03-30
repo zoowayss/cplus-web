@@ -144,32 +144,27 @@ std::string DiscussionReply::toJson() const {
 // 讨论数据访问对象的实现
 bool DiscussionDAO::createDiscussion(Discussion& discussion) {
     try {
-        // 获取数据库连接
-        auto conn = Database::getInstance()->getConnection();
+        // 使用数据库实例直接执行命令，而不是直接获取连接
+        Database* db = Database::getInstance();
         
-        // 准备SQL语句
-        std::string sql = "INSERT INTO discussions (problem_id, user_id, title, content, views, likes, created_at, updated_at) "
-                        "VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
-        
-        // 使用mysql_query直接执行SQL
-        // 这里简化实现，实际应使用参数化查询避免SQL注入
+        // 使用参数化查询避免SQL注入
         std::string insert_sql = "INSERT INTO discussions (problem_id, user_id, title, content, views, likes, created_at, updated_at) "
                                "VALUES (" + std::to_string(discussion.getProblemId()) + ", " 
                                + std::to_string(discussion.getUserId()) + ", '"
-                               + Database::getInstance()->escapeString(discussion.getTitle()) + "', '"
-                               + Database::getInstance()->escapeString(discussion.getContent()) + "', "
+                               + db->escapeString(discussion.getTitle()) + "', '"
+                               + db->escapeString(discussion.getContent()) + "', "
                                + std::to_string(discussion.getViews()) + ", "
                                + std::to_string(discussion.getLikes()) + ", "
                                + std::to_string(discussion.getCreatedAt()) + ", "
                                + std::to_string(discussion.getUpdatedAt()) + ")";
         
-        if (mysql_query(conn, insert_sql.c_str()) != 0) {
-            std::cerr << "插入讨论失败: " << mysql_error(conn) << std::endl;
+        if (!db->executeCommand(insert_sql)) {
+            std::cerr << "插入讨论失败" << std::endl;
             return false;
         }
         
         // 获取自增ID
-        discussion.setId(static_cast<int>(mysql_insert_id(conn)));
+        discussion.setId(db->getLastInsertId());
         
         return true;
     } catch (const std::exception& e) {
@@ -182,23 +177,17 @@ Discussion DiscussionDAO::getDiscussionById(int id) {
     Discussion discussion;
     
     try {
-        // 获取数据库连接
-        auto conn = Database::getInstance()->getConnection();
+        // 使用数据库实例直接执行查询，而不是直接获取连接
+        Database* db = Database::getInstance();
         
         // 构建SQL语句
         std::string sql = "SELECT id, problem_id, user_id, title, content, views, likes, created_at, updated_at "
                         "FROM discussions WHERE id = " + std::to_string(id);
         
         // 执行查询
-        if (mysql_query(conn, sql.c_str()) != 0) {
-            std::cerr << "查询讨论失败: " << mysql_error(conn) << std::endl;
-            return discussion;
-        }
-        
-        // 获取结果集
-        MYSQL_RES* result = mysql_store_result(conn);
+        MYSQL_RES* result = db->executeQuery(sql);
         if (result == nullptr) {
-            std::cerr << "获取结果集失败: " << mysql_error(conn) << std::endl;
+            std::cerr << "查询讨论失败" << std::endl;
             return discussion;
         }
         
@@ -227,27 +216,27 @@ Discussion DiscussionDAO::getDiscussionById(int id) {
 
 bool DiscussionDAO::updateDiscussion(const Discussion& discussion) {
     try {
-        // 获取数据库连接
-        auto conn = Database::getInstance()->getConnection();
+        // 使用数据库实例直接执行命令
+        Database* db = Database::getInstance();
         
         // 构建SQL语句
         std::string sql = "UPDATE discussions SET problem_id = " + std::to_string(discussion.getProblemId()) + 
                           ", user_id = " + std::to_string(discussion.getUserId()) + 
-                          ", title = '" + Database::getInstance()->escapeString(discussion.getTitle()) + "'" +
-                          ", content = '" + Database::getInstance()->escapeString(discussion.getContent()) + "'" +
+                          ", title = '" + db->escapeString(discussion.getTitle()) + "'" +
+                          ", content = '" + db->escapeString(discussion.getContent()) + "'" +
                           ", views = " + std::to_string(discussion.getViews()) + 
                           ", likes = " + std::to_string(discussion.getLikes()) + 
                           ", updated_at = " + std::to_string(std::time(nullptr)) + 
                           " WHERE id = " + std::to_string(discussion.getId());
         
         // 执行更新
-        if (mysql_query(conn, sql.c_str()) != 0) {
-            std::cerr << "更新讨论失败: " << mysql_error(conn) << std::endl;
+        if (!db->executeCommand(sql)) {
+            std::cerr << "更新讨论失败" << std::endl;
             return false;
         }
         
         // 检查影响的行数
-        return mysql_affected_rows(conn) > 0;
+        return db->getAffectedRows() > 0;
     } catch (const std::exception& e) {
         std::cerr << "更新讨论失败: " << e.what() << std::endl;
         return false;
@@ -256,20 +245,20 @@ bool DiscussionDAO::updateDiscussion(const Discussion& discussion) {
 
 bool DiscussionDAO::deleteDiscussion(int id) {
     try {
-        // 获取数据库连接
-        auto conn = Database::getInstance()->getConnection();
+        // 使用数据库实例直接执行命令
+        Database* db = Database::getInstance();
         
         // 构建SQL语句
         std::string sql = "DELETE FROM discussions WHERE id = " + std::to_string(id);
         
         // 执行删除
-        if (mysql_query(conn, sql.c_str()) != 0) {
-            std::cerr << "删除讨论失败: " << mysql_error(conn) << std::endl;
+        if (!db->executeCommand(sql)) {
+            std::cerr << "删除讨论失败" << std::endl;
             return false;
         }
         
         // 检查影响的行数
-        return mysql_affected_rows(conn) > 0;
+        return db->getAffectedRows() > 0;
     } catch (const std::exception& e) {
         std::cerr << "删除讨论失败: " << e.what() << std::endl;
         return false;
@@ -280,8 +269,8 @@ std::vector<Discussion> DiscussionDAO::getAllDiscussions(int offset, int limit) 
     std::vector<Discussion> discussions;
     
     try {
-        // 获取数据库连接
-        auto conn = Database::getInstance()->getConnection();
+        // 使用数据库实例直接执行查询
+        Database* db = Database::getInstance();
         
         // 构建SQL语句
         std::string sql = "SELECT id, problem_id, user_id, title, content, views, likes, created_at, updated_at "
@@ -289,15 +278,9 @@ std::vector<Discussion> DiscussionDAO::getAllDiscussions(int offset, int limit) 
                         " OFFSET " + std::to_string(offset);
         
         // 执行查询
-        if (mysql_query(conn, sql.c_str()) != 0) {
-            std::cerr << "查询所有讨论失败: " << mysql_error(conn) << std::endl;
-            return discussions;
-        }
-        
-        // 获取结果集
-        MYSQL_RES* result = mysql_store_result(conn);
+        MYSQL_RES* result = db->executeQuery(sql);
         if (result == nullptr) {
-            std::cerr << "获取结果集失败: " << mysql_error(conn) << std::endl;
+            std::cerr << "查询所有讨论失败" << std::endl;
             return discussions;
         }
         
@@ -330,8 +313,8 @@ std::vector<Discussion> DiscussionDAO::getDiscussionsByProblemId(int problem_id,
     std::vector<Discussion> discussions;
     
     try {
-        // 获取数据库连接
-        auto conn = Database::getInstance()->getConnection();
+        // 使用数据库实例直接执行查询
+        Database* db = Database::getInstance();
         
         // 构建SQL语句
         std::string sql = "SELECT id, problem_id, user_id, title, content, views, likes, created_at, updated_at "
@@ -340,15 +323,9 @@ std::vector<Discussion> DiscussionDAO::getDiscussionsByProblemId(int problem_id,
                         " OFFSET " + std::to_string(offset);
         
         // 执行查询
-        if (mysql_query(conn, sql.c_str()) != 0) {
-            std::cerr << "查询题目讨论失败: " << mysql_error(conn) << std::endl;
-            return discussions;
-        }
-        
-        // 获取结果集
-        MYSQL_RES* result = mysql_store_result(conn);
+        MYSQL_RES* result = db->executeQuery(sql);
         if (result == nullptr) {
-            std::cerr << "获取结果集失败: " << mysql_error(conn) << std::endl;
+            std::cerr << "查询题目讨论失败" << std::endl;
             return discussions;
         }
         
@@ -382,27 +359,27 @@ std::vector<Discussion> DiscussionDAO::getDiscussionsByProblemId(int problem_id,
 // 讨论回复DAO实现
 bool DiscussionDAO::createDiscussionReply(DiscussionReply& reply) {
     try {
-        // 获取数据库连接
-        auto conn = Database::getInstance()->getConnection();
+        // 使用数据库实例直接执行命令
+        Database* db = Database::getInstance();
         
         // 构建SQL语句
         std::string sql = "INSERT INTO discussion_replies (discussion_id, user_id, parent_id, content, likes, created_at, updated_at) "
                       "VALUES (" + std::to_string(reply.getDiscussionId()) + ", " 
                       + std::to_string(reply.getUserId()) + ", "
                       + std::to_string(reply.getParentId()) + ", '"
-                      + Database::getInstance()->escapeString(reply.getContent()) + "', "
+                      + db->escapeString(reply.getContent()) + "', "
                       + std::to_string(reply.getLikes()) + ", "
                       + std::to_string(reply.getCreatedAt()) + ", "
                       + std::to_string(reply.getUpdatedAt()) + ")";
         
         // 执行插入
-        if (mysql_query(conn, sql.c_str()) != 0) {
-            std::cerr << "插入回复失败: " << mysql_error(conn) << std::endl;
+        if (!db->executeCommand(sql)) {
+            std::cerr << "插入回复失败" << std::endl;
             return false;
         }
         
         // 获取自增ID
-        reply.setId(static_cast<int>(mysql_insert_id(conn)));
+        reply.setId(db->getLastInsertId());
         
         return true;
     } catch (const std::exception& e) {
@@ -415,8 +392,8 @@ std::vector<DiscussionReply> DiscussionDAO::getRepliesByDiscussionId(int discuss
     std::vector<DiscussionReply> replies;
     
     try {
-        // 获取数据库连接
-        auto conn = Database::getInstance()->getConnection();
+        // 使用数据库实例直接执行查询
+        Database* db = Database::getInstance();
         
         // 构建SQL语句 - 获取顶层回复（parent_id=0）
         std::string sql = "SELECT id, discussion_id, user_id, parent_id, content, likes, created_at, updated_at "
@@ -425,15 +402,9 @@ std::vector<DiscussionReply> DiscussionDAO::getRepliesByDiscussionId(int discuss
                         " OFFSET " + std::to_string(offset);
         
         // 执行查询
-        if (mysql_query(conn, sql.c_str()) != 0) {
-            std::cerr << "查询讨论回复失败: " << mysql_error(conn) << std::endl;
-            return replies;
-        }
-        
-        // 获取结果集
-        MYSQL_RES* result = mysql_store_result(conn);
+        MYSQL_RES* result = db->executeQuery(sql);
         if (result == nullptr) {
-            std::cerr << "获取结果集失败: " << mysql_error(conn) << std::endl;
+            std::cerr << "查询讨论回复失败" << std::endl;
             return replies;
         }
         
@@ -466,8 +437,8 @@ std::vector<DiscussionReply> DiscussionDAO::getChildReplies(int parent_id, int o
     std::vector<DiscussionReply> replies;
     
     try {
-        // 获取数据库连接
-        auto conn = Database::getInstance()->getConnection();
+        // 使用数据库实例直接执行查询
+        Database* db = Database::getInstance();
         
         // 构建SQL语句
         std::string sql = "SELECT id, discussion_id, user_id, parent_id, content, likes, created_at, updated_at "
@@ -476,15 +447,9 @@ std::vector<DiscussionReply> DiscussionDAO::getChildReplies(int parent_id, int o
                         " OFFSET " + std::to_string(offset);
         
         // 执行查询
-        if (mysql_query(conn, sql.c_str()) != 0) {
-            std::cerr << "查询子回复失败: " << mysql_error(conn) << std::endl;
-            return replies;
-        }
-        
-        // 获取结果集
-        MYSQL_RES* result = mysql_store_result(conn);
+        MYSQL_RES* result = db->executeQuery(sql);
         if (result == nullptr) {
-            std::cerr << "获取结果集失败: " << mysql_error(conn) << std::endl;
+            std::cerr << "查询子回复失败" << std::endl;
             return replies;
         }
         
@@ -517,23 +482,17 @@ DiscussionReply DiscussionDAO::getDiscussionReplyById(int id) {
     DiscussionReply reply;
     
     try {
-        // 获取数据库连接
-        auto conn = Database::getInstance()->getConnection();
+        // 使用数据库实例直接执行查询
+        Database* db = Database::getInstance();
         
         // 构建SQL语句
         std::string sql = "SELECT id, discussion_id, user_id, parent_id, content, likes, created_at, updated_at "
                         "FROM discussion_replies WHERE id = " + std::to_string(id);
         
         // 执行查询
-        if (mysql_query(conn, sql.c_str()) != 0) {
-            std::cerr << "查询回复失败: " << mysql_error(conn) << std::endl;
-            return reply;
-        }
-        
-        // 获取结果集
-        MYSQL_RES* result = mysql_store_result(conn);
+        MYSQL_RES* result = db->executeQuery(sql);
         if (result == nullptr) {
-            std::cerr << "获取结果集失败: " << mysql_error(conn) << std::endl;
+            std::cerr << "查询回复失败" << std::endl;
             return reply;
         }
         
@@ -562,20 +521,20 @@ DiscussionReply DiscussionDAO::getDiscussionReplyById(int id) {
 // 删除回复
 bool DiscussionDAO::deleteDiscussionReply(int id) {
     try {
-        // 获取数据库连接
-        auto conn = Database::getInstance()->getConnection();
+        // 使用数据库实例直接执行命令
+        Database* db = Database::getInstance();
         
         // 构建SQL语句
         std::string sql = "DELETE FROM discussion_replies WHERE id = " + std::to_string(id);
         
         // 执行删除
-        if (mysql_query(conn, sql.c_str()) != 0) {
-            std::cerr << "删除回复失败: " << mysql_error(conn) << std::endl;
+        if (!db->executeCommand(sql)) {
+            std::cerr << "删除回复失败" << std::endl;
             return false;
         }
         
         // 检查影响的行数
-        return mysql_affected_rows(conn) > 0;
+        return db->getAffectedRows() > 0;
     } catch (const std::exception& e) {
         std::cerr << "删除回复失败: " << e.what() << std::endl;
         return false;

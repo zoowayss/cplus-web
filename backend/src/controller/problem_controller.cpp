@@ -30,32 +30,26 @@ void ProblemController::registerRoutes(http::HttpServer* server) {
     // 题目列表路由 - 注意：路由应该包含查询参数的处理
     server->get("/api/problems", [this](const http::Request& req, http::Response& res) {
         std::cout << "Received request to /api/problems with path: " << req.path << std::endl;
-        // 打开CORS
-        res.set_cors_headers();
         this->handleGetProblems(req, res);
     });
     
     // 题目详情路由
     server->get("/api/problems/[0-9]+", [this](const http::Request& req, http::Response& res) {
-        res.set_cors_headers();
         this->handleGetProblemDetail(req, res);
     });
     
     // 创建题目路由 - 需要管理员权限
     server->post("/api/problems", middleware::AuthMiddleware::protectWithRole([this](const http::Request& req, http::Response& res) {
-        res.set_cors_headers();
         this->handleCreateProblem(req, res);
     }, 2)); // 角色2为管理员
     
     // 更新题目路由 - 需要管理员权限
     server->put("/api/problems/[0-9]+", middleware::AuthMiddleware::protectWithRole([this](const http::Request& req, http::Response& res) {
-        res.set_cors_headers();
         this->handleUpdateProblem(req, res);
     }, 2));
     
     // 删除题目路由 - 需要管理员权限
     server->del("/api/problems/[0-9]+", middleware::AuthMiddleware::protectWithRole([this](const http::Request& req, http::Response& res) {
-        res.set_cors_headers();
         this->handleDeleteProblem(req, res);
     }, 2));
     
@@ -63,69 +57,55 @@ void ProblemController::registerRoutes(http::HttpServer* server) {
     
     // 获取题目的测试用例
     server->get("/api/problems/[0-9]+/testcases", middleware::AuthMiddleware::protectWithRole([this](const http::Request& req, http::Response& res) {
-        res.set_cors_headers();
         this->handleGetTestCases(req, res);
     }, 2));
     
     // 添加测试用例
     server->post("/api/problems/[0-9]+/testcases", middleware::AuthMiddleware::protectWithRole([this](const http::Request& req, http::Response& res) {
-        res.set_cors_headers();
         this->handleAddTestCase(req, res);
     }, 2));
     
     // 更新测试用例
     server->put("/api/testcases/[0-9]+", middleware::AuthMiddleware::protectWithRole([this](const http::Request& req, http::Response& res) {
-        res.set_cors_headers();
         this->handleUpdateTestCase(req, res);
     }, 2));
     
     // 删除测试用例
     server->del("/api/testcases/[0-9]+", middleware::AuthMiddleware::protectWithRole([this](const http::Request& req, http::Response& res) {
-        res.set_cors_headers();
         this->handleDeleteTestCase(req, res);
     }, 2));
     
     // 获取题目的提交记录
     server->get("/api/problems/[0-9]+/submissions", middleware::AuthMiddleware::protect([this](const http::Request& req, http::Response& res) {
-        res.set_cors_headers();
         this->handleGetProblemSubmissions(req, res);
     }));
     
     // 获取所有提交记录
     server->get("/api/submissions", middleware::AuthMiddleware::protect([this](const http::Request& req, http::Response& res) {
-        res.set_cors_headers();
         this->handleGetAllSubmissions(req, res);
     }));
     
     // 提交代码路由
     server->post("/api/submissions", middleware::AuthMiddleware::protect([this](const http::Request& req, http::Response& res) {
-        res.set_cors_headers();
         this->handleSubmitCode(req, res);
     }));
     
     // 获取单个提交详情
     server->get("/api/submissions/[0-9]+", middleware::AuthMiddleware::protect([this](const http::Request& req, http::Response& res) {
-        res.set_cors_headers();
         this->handleGetSubmissionDetail(req, res);
     }));
     
     // 重新提交代码
     server->post("/api/submissions/resubmit/[0-9]+", middleware::AuthMiddleware::protect([this](const http::Request& req, http::Response& res) {
-        res.set_cors_headers();
         this->handleResubmitCode(req, res);
     }));
     
-    // 添加一个通用路由来处理 /api/problems 并打印所有请求信息
-    server->get("/api/.*", [](const http::Request& req, http::Response& res) {
-        std::cout << "Catch-all route hit: " << req.path << std::endl;
+    // 移除通用捕获路由或将其放在最后，避免拦截特定路由
+    // 注意：此路由可能导致短时间内多次请求返回"API is running"，应谨慎使用
+    // 最好只在开发/测试环境启用此路由
+    server->get("/api/status", [](const http::Request& req, http::Response& res) {
+        std::cout << "API状态检查: " << req.path << std::endl;
         
-        // 打印请求头
-        std::cout << "Request headers:" << std::endl;
-        for(const auto& header : req.headers) {
-            std::cout << "  " << header.first << ": " << header.second << std::endl;
-        }
-        
-        res.set_cors_headers();
         res.status_code = 200;
         res.body = "{\"status\":\"ok\",\"message\":\"API is running\"}";
     });
@@ -230,25 +210,43 @@ void ProblemController::handleGetProblems(const http::Request& req, http::Respon
 // 获取题目详情
 void ProblemController::handleGetProblemDetail(const http::Request& req, http::Response& res) {
     // 从URL中提取题目ID
+    std::cout << "开始处理获取题目详情请求，路径: " << req.path << std::endl;
+    
     int problem_id = getIdFromPath(req.path, "/api/problems/");
     if (problem_id <= 0) {
+        std::cerr << "错误: 从路径 " << req.path << " 提取的题目ID无效: " << problem_id << std::endl;
         sendErrorResponse(res, "无效的题目ID", 400);
         return;
     }
     
-    // 获取题目详情（包括示例测试用例）
-    Problem problem = ProblemService::getProblemById(problem_id, true);
+    std::cout << "获取题目详情，题目ID: " << problem_id << std::endl;
     
-    if (problem.getId() == 0) {
-        sendErrorResponse(res, "题目不存在", 404);
+    // 获取题目详情（包括示例测试用例）
+    try {
+        Problem problem = ProblemService::getProblemById(problem_id, true);
+        
+        if (problem.getId() == 0) {
+            std::cerr << "错误: 题目ID " << problem_id << " 不存在" << std::endl;
+            sendErrorResponse(res, "题目不存在", 404);
+            return;
+        }
+        
+        // 构建响应
+        Json::Value data;
+        data["problem"] = problem.toJson();
+        
+        std::cout << "成功获取题目详情，题目ID: " << problem_id << ", 标题: " << problem.getTitle() << std::endl;
+        
+        sendSuccessResponse(res, "获取题目详情成功", data);
+    } catch (const std::exception& e) {
+        std::cerr << "处理获取题目详情时发生异常，题目ID: " << problem_id << ", 错误信息: " << e.what() << std::endl;
+        sendErrorResponse(res, "获取题目详情失败: " + std::string(e.what()), 500);
+        return;
+    } catch (...) {
+        std::cerr << "处理获取题目详情时发生未知异常，题目ID: " << problem_id << std::endl;
+        sendErrorResponse(res, "获取题目详情失败: 未知错误", 500);
         return;
     }
-    
-    // 构建响应
-    Json::Value data;
-    data["problem"] = problem.toJson();
-    
-    sendSuccessResponse(res, "获取题目详情成功", data);
 }
 
 // 创建题目
@@ -352,19 +350,31 @@ void ProblemController::handleDeleteProblem(const http::Request& req, http::Resp
         return;
     }
     
+    std::cout << "尝试删除题目 ID: " << problem_id << std::endl;
+    
     // 从请求头获取令牌获取用户ID和角色
     std::string auth_header = req.get_header("Authorization");
+    if (auth_header.empty() || auth_header.length() <= 7) {
+        std::cout << "删除题目失败: 无效的Authorization头" << std::endl;
+        sendErrorResponse(res, "无效的认证信息", 401);
+        return;
+    }
+    
     std::string token = auth_header.substr(7);
     int user_id = JWT::getUserIdFromToken(token);
     int user_role = JWT::getUserRoleFromToken(token);
     
+    std::cout << "删除题目请求来自用户ID: " << user_id << ", 角色: " << user_role << std::endl;
+    
     if (user_id <= 0) {
+        std::cout << "删除题目失败: 无效的用户ID" << std::endl;
         sendErrorResponse(res, "无效的用户ID", 401);
         return;
     }
     
     // 检查权限
     if (!ProblemService::checkProblemPermission(problem_id, user_id, user_role)) {
+        std::cout << "删除题目失败: 用户 " << user_id << " 没有权限删除题目 " << problem_id << std::endl;
         sendErrorResponse(res, "没有权限删除此题目", 403);
         return;
     }
@@ -372,8 +382,10 @@ void ProblemController::handleDeleteProblem(const http::Request& req, http::Resp
     // 删除题目
     std::string error_message;
     if (ProblemService::deleteProblem(problem_id, error_message)) {
+        std::cout << "成功删除题目 ID: " << problem_id << std::endl;
         sendSuccessResponse(res, "删除题目成功");
     } else {
+        std::cout << "删除题目 " << problem_id << " 失败: " << error_message << std::endl;
         sendErrorResponse(res, error_message, 500);
     }
 }

@@ -12,6 +12,18 @@ const service = axios.create({
 // 请求拦截器
 service.interceptors.request.use(
   config => {
+    // 添加请求日志
+    console.log(`发送 ${config.method.toUpperCase()} 请求: ${config.url}`, config);
+    
+    // 特别记录DELETE请求
+    if (config.method.toLowerCase() === 'delete') {
+      console.log('DELETE请求详情:', {
+        url: config.url,
+        headers: config.headers,
+        data: config.data
+      });
+    }
+    
     // 请求头带上token
     if (store.getters.isAuthenticated) {
       // 移除token中可能存在的换行符
@@ -21,7 +33,7 @@ service.interceptors.request.use(
     return config
   },
   error => {
-    console.error(error)
+    console.error('请求错误:', error)
     return Promise.reject(error)
   }
 )
@@ -30,7 +42,7 @@ service.interceptors.request.use(
 service.interceptors.response.use(
   response => {
     const res = response.data
-    console.log('API响应:', res);
+    console.log(`收到响应:`, response.config.url, res);
     
     // 请求成功 - 额外处理"正在评测"的特殊情况
     if (res.code === 200 || res.status === 'ok' || 
@@ -51,6 +63,15 @@ service.interceptors.response.use(
   },
   error => {
     console.error('响应错误: ', error)
+    
+    // 记录DELETE请求的错误详情
+    if (error.config && error.config.method === 'delete') {
+      console.error('DELETE请求失败详情:', {
+        url: error.config.url,
+        status: error.response?.status,
+        data: error.response?.data
+      });
+    }
     
     // 检查是否是评测相关的错误，如果是则认为是成功的
     const errorMessage = error.response?.data?.message || error.message || '';

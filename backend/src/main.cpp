@@ -7,7 +7,7 @@
 #include "../include/http/http_server.h"
 #include "../include/utils/jwt.h"
 #include "../include/controller/controller_manager.h"
-#include <json/json.h>
+#include "../lib/jsoncpp/include/json/json.h"
 
 // 全局HTTP服务器实例
 http::HttpServer* server = nullptr;
@@ -23,6 +23,16 @@ void signal_handler(int signal) {
 
 int main(int argc, char** argv) {
     std::cout << "启动在线评测系统后端..." << std::endl;
+    
+    // 解析命令行参数
+    uint16_t port = 8080; // 默认端口
+    for (int i = 1; i < argc; i++) {
+        std::string arg = argv[i];
+        if (arg == "--port" && i + 1 < argc) {
+            port = static_cast<uint16_t>(std::stoi(argv[i + 1]));
+            i++; // 跳过下一个参数
+        }
+    }
     
     // 注册信号处理器，以便正确处理Ctrl+C等信号
     signal(SIGINT, signal_handler);
@@ -45,8 +55,8 @@ int main(int argc, char** argv) {
     
     std::cout << "数据库连接成功" << std::endl;
     
-    // 创建HTTP服务器，监听8080端口
-    server = new http::HttpServer(8080);
+    // 创建HTTP服务器，使用httplib实现，监听指定端口
+    server = new http::HttpServer(port);
     
     // 使用控制器管理器注册所有路由
     ControllerManager controllerManager;
@@ -206,29 +216,30 @@ int main(int argc, char** argv) {
         std::cout << "讨论回复表已就绪" << std::endl;
     }
     
-    // 添加讨论表索引
+    // 修改MySQL索引创建语法，去掉IF NOT EXISTS
     std::string create_discussions_index = 
-        "CREATE INDEX IF NOT EXISTS idx_discussions_problem_id ON discussions(problem_id)";
+        "CREATE INDEX idx_discussions_problem_id ON discussions(problem_id)";
     if (!db->executeCommand(create_discussions_index)) {
-        std::cerr << "创建讨论表索引失败" << std::endl;
+        std::cerr << "创建讨论表索引失败，索引可能已存在" << std::endl;
     }
     
     // 添加讨论回复表索引
     std::string create_discussion_replies_index1 = 
-        "CREATE INDEX IF NOT EXISTS idx_discussion_replies_discussion_id ON discussion_replies(discussion_id)";
+        "CREATE INDEX idx_discussion_replies_discussion_id ON discussion_replies(discussion_id)";
     if (!db->executeCommand(create_discussion_replies_index1)) {
-        std::cerr << "创建讨论回复表索引1失败" << std::endl;
+        std::cerr << "创建讨论回复表索引1失败，索引可能已存在" << std::endl;
     }
     
     std::string create_discussion_replies_index2 = 
-        "CREATE INDEX IF NOT EXISTS idx_discussion_replies_parent_id ON discussion_replies(parent_id)";
+        "CREATE INDEX idx_discussion_replies_parent_id ON discussion_replies(parent_id)";
     if (!db->executeCommand(create_discussion_replies_index2)) {
-        std::cerr << "创建讨论回复表索引2失败" << std::endl;
+        std::cerr << "创建讨论回复表索引2失败，索引可能已存在" << std::endl;
     }
     
     // 启动HTTP服务器
+    std::cout << "尝试启动HTTP服务器，监听端口: " << port << std::endl;
     if (!server->start()) {
-        std::cerr << "HTTP服务器启动失败" << std::endl;
+        std::cerr << "HTTP服务器启动失败，端口 " << port << " 可能已被占用" << std::endl;
         delete server;
         db->close();
         return 1;
@@ -238,15 +249,11 @@ int main(int argc, char** argv) {
     std::cout << "后端服务器正在运行..." << std::endl;
     std::cout << "按Ctrl+C终止服务器..." << std::endl;
     
-    // 主线程等待，让服务器线程继续运行
-    while(true) {
-        std::this_thread::sleep_for(std::chrono::seconds(1));
-    }
+    // httplib 服务器是阻塞的，所以不需要额外的循环来保持主线程活动
+    // 程序会在这里阻塞，直到服务器停止
     
-    // 正常情况下不会执行到这里，因为服务器会在接收到信号时退出
-    // 但作为安全措施，我们也在这里清理资源
+    // 如果代码执行到这里，说明服务器已经停止
     if (server) {
-        server->stop();
         delete server;
     }
     

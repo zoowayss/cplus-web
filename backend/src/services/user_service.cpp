@@ -10,30 +10,20 @@
 // 验证密码强度
 bool UserService::validatePassword(const std::string& password) {
     // 密码长度至少6位
-    if (password.length() < 6) {
-        return false;
-    }
-    
-    // 不再要求必须包含字母和数字
-    return true;
+    return password.length() >= 6;
 }
 
 // 验证用户名格式
 bool UserService::validateUsername(const std::string& username) {
-    // 用户名长度在3-20之间
-    if (username.length() < 3 || username.length() > 20) {
-        return false;
-    }
-    
-    // 用户名只能包含字母、数字和下划线
-    std::regex pattern("^[a-zA-Z0-9_]+$");
+    // 用户名长度在3-20之间，只能包含字母、数字和下划线
+    std::regex pattern("^[a-zA-Z0-9_]{3,20}$");
     return std::regex_match(username, pattern);
 }
 
 // 验证邮箱格式
 bool UserService::validateEmail(const std::string& email) {
     // 简单的邮箱格式验证
-    std::regex pattern(R"([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})");
+    std::regex pattern("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
     return std::regex_match(email, pattern);
 }
 
@@ -49,7 +39,7 @@ bool UserService::isUserExist(const std::string& username) {
     }
     
     MYSQL_ROW row = mysql_fetch_row(result);
-    bool exists = row && std::stoi(row[0]) > 0;
+    bool exists = (row && row[0] && std::stoi(row[0]) > 0);
     
     mysql_free_result(result);
     return exists;
@@ -67,44 +57,49 @@ bool UserService::isEmailExist(const std::string& email) {
     }
     
     MYSQL_ROW row = mysql_fetch_row(result);
-    bool exists = row && std::stoi(row[0]) > 0;
+    bool exists = (row && row[0] && std::stoi(row[0]) > 0);
     
     mysql_free_result(result);
     return exists;
 }
 
 // 用户注册
-bool UserService::registerUser(const std::string& username, const std::string& password, 
-                              const std::string& email, std::string& error_message) {
-    // 验证输入
+bool UserService::registerUser(const std::string& username, const std::string& email, 
+                             const std::string& password, std::string& error_message) {
+    // 验证用户名
     if (!validateUsername(username)) {
-        error_message = "用户名格式不正确，只能包含字母、数字和下划线，长度3-20位";
+        error_message = "用户名格式不正确";
         return false;
     }
     
-    if (!validatePassword(password)) {
-        error_message = "密码长度不能少于6位";
-        return false;
-    }
-    
+    // 验证邮箱
     if (!validateEmail(email)) {
         error_message = "邮箱格式不正确";
         return false;
     }
     
-    // 检查用户名和邮箱是否已存在
+    // 验证密码
+    if (!validatePassword(password)) {
+        error_message = "密码长度不能少于6位";
+        return false;
+    }
+    
+    // 检查用户名是否已存在
     if (isUserExist(username)) {
         error_message = "用户名已存在";
         return false;
     }
     
+    // 检查邮箱是否已存在
     if (isEmailExist(email)) {
         error_message = "邮箱已注册";
         return false;
     }
     
-    // 生成密码哈希和盐
-    auto [password_hash, salt] = User::generatePasswordHash(password);
+    // 生成密码哈希和盐 - C++11兼容写法
+    std::pair<std::string, std::string> password_data = User::generatePasswordHash(password);
+    std::string password_hash = password_data.first;
+    std::string salt = password_data.second;
     
     // 获取数据库连接
     Database* db = Database::getInstance();
@@ -222,7 +217,11 @@ bool UserService::updateUserInfo(int user_id, const std::map<std::string, std::s
     std::string query = "UPDATE users SET ";
     bool first = true;
     
-    for (const auto& [key, value] : user_data) {
+    // C++11兼容的迭代方式
+    for (const auto& pair : user_data) {
+        const std::string& key = pair.first;
+        const std::string& value = pair.second;
+        
         // 只允许更新某些字段
         if (key != "username" && key != "email" && key != "avatar") {
             continue;
@@ -307,8 +306,10 @@ bool UserService::changePassword(int user_id, const std::string& old_password,
         return false;
     }
     
-    // 生成新的密码哈希和盐
-    auto [password_hash, salt] = User::generatePasswordHash(new_password);
+    // 生成新的密码哈希和盐 - C++11兼容写法
+    std::pair<std::string, std::string> password_data = User::generatePasswordHash(new_password);
+    std::string password_hash = password_data.first;
+    std::string salt = password_data.second;
     
     // 获取数据库连接
     Database* db = Database::getInstance();

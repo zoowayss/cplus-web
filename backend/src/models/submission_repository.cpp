@@ -23,7 +23,7 @@ bool SubmissionRepository::createSubmission(Submission& submission) {
         << time(nullptr) << ")";
     
     if (!db->executeCommand(sql.str())) {
-        std::cerr << "创建提交记录失败: " << mysql_error(db->getConnection()) << std::endl;
+        std::cerr << "创建提交记录失败" << std::endl;
         return false;
     }
     
@@ -126,7 +126,7 @@ bool SubmissionRepository::updateSubmission(const Submission& submission) {
         << "WHERE id = " << submission.getId();
     
     if (!db->executeCommand(sql.str())) {
-        std::cerr << "更新提交记录失败: " << mysql_error(db->getConnection()) << std::endl;
+        std::cerr << "更新提交记录失败" << std::endl;
         return false;
     }
     
@@ -148,7 +148,7 @@ bool SubmissionRepository::addTestResult(int submission_id, TestPointResult& tes
         << "'" << db->escapeString(test_result.getOutput()) << "')";
     
     if (!db->executeCommand(sql.str())) {
-        std::cerr << "添加测试点结果失败: " << mysql_error(db->getConnection()) << std::endl;
+        std::cerr << "添加测试点结果失败" << std::endl;
         return false;
     }
     

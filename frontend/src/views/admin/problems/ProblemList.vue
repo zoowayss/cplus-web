@@ -284,8 +284,11 @@ export default {
     deleteProblem() {
       if (!this.problemToDelete) return;
       
+      console.log('尝试删除题目:', this.problemToDelete.id);
+      
       deleteProblem(this.problemToDelete.id)
         .then(response => {
+          console.log('删除题目响应:', response);
           if (response.status === 'ok') {
             this.$message.success('删除题目成功');
             // 关闭对话框
@@ -298,7 +301,23 @@ export default {
         })
         .catch(error => {
           console.error('删除题目失败:', error);
-          this.$message.error('删除题目失败，请稍后再试');
+          // 显示详细错误信息
+          const errorMessage = error.response?.data?.message || error.message || '未知错误';
+          this.$message({
+            type: 'error',
+            message: `删除题目失败: ${errorMessage}`,
+            duration: 5000,
+            showClose: true
+          });
+          
+          // 如果是权限问题，提示用户
+          if (error.response?.status === 403) {
+            this.$message({
+              type: 'warning',
+              message: '您可能没有权限删除该题目，请联系管理员',
+              duration: 5000
+            });
+          }
         });
     },
     

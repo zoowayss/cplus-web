@@ -5,7 +5,6 @@
 /backend/lib/
 /backend/obj/
 /backend/out/
-/backend/cmake-build-*/
 
 # 依赖库
 /backend/vendor/
@@ -22,20 +21,6 @@
 *.exe
 *.out
 *.app
-
-# CMake生成的文件
-CMakeCache.txt
-CMakeFiles
-CMakeScripts
-Testing
-Makefile
-cmake_install.cmake
-install_manifest.txt
-compile_commands.json
-CTestTestfile.cmake
-build.ninja
-.ninja_deps
-.ninja_log
 
 # 前端相关忽略项
 # Node模块

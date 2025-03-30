@@ -8,55 +8,46 @@
 void DiscussionController::registerRoutes(http::HttpServer* server) {
     // 获取所有讨论
     server->get("/api/discussions", [this](const http::Request& req, http::Response& res) {
-        res.set_cors_headers();
         this->handleGetAllDiscussions(req, res);
     });
     
     // 获取题目相关讨论
     server->get("/api/problems/[0-9]+/discussions", [this](const http::Request& req, http::Response& res) {
-        res.set_cors_headers();
         this->handleGetProblemDiscussions(req, res);
     });
     
     // 获取讨论详情
     server->get("/api/discussions/[0-9]+", [this](const http::Request& req, http::Response& res) {
-        res.set_cors_headers();
         this->handleGetDiscussionDetail(req, res);
     });
     
     // 创建讨论
     server->post("/api/discussions", middleware::AuthMiddleware::protect([this](const http::Request& req, http::Response& res) {
-        res.set_cors_headers();
         this->handleCreateDiscussion(req, res);
     }));
     
     // 更新讨论
     server->put("/api/discussions/[0-9]+", middleware::AuthMiddleware::protect([this](const http::Request& req, http::Response& res) {
-        res.set_cors_headers();
         this->handleUpdateDiscussion(req, res);
     }));
     
     // 删除讨论
     server->del("/api/discussions/[0-9]+", middleware::AuthMiddleware::protect([this](const http::Request& req, http::Response& res) {
-        res.set_cors_headers();
         this->handleDeleteDiscussion(req, res);
     }));
     
     // 获取讨论回复
     server->get("/api/discussions/[0-9]+/replies", [this](const http::Request& req, http::Response& res) {
-        res.set_cors_headers();
         this->handleGetReplies(req, res);
     });
     
     // 创建回复
     server->post("/api/discussions/[0-9]+/replies", middleware::AuthMiddleware::protect([this](const http::Request& req, http::Response& res) {
-        res.set_cors_headers();
         this->handleCreateReply(req, res);
     }));
     
     // 删除回复
     server->del("/api/replies/[0-9]+", middleware::AuthMiddleware::protect([this](const http::Request& req, http::Response& res) {
-        res.set_cors_headers();
         this->handleDeleteReply(req, res);
     }));
 }

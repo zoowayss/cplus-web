@@ -235,11 +235,11 @@ export default {
           offset: this.offset,
           limit: this.limit
         });
+        console.log(response);
         
-        if (response.status === 'success') {
-          this.discussions = response.data.discussions || [];
-          this.total = response.data.total || 0;
-          console.log('讨论数据:', this.discussions);
+        if (response.status === 'ok') {
+          this.discussions = response.discussions || [];
+          this.total = response.total || 0;
         } else {
           this.$message.error(response.message || '获取讨论列表失败');
         }
@@ -300,8 +300,8 @@ export default {
         // 获取讨论详情
         const response = await getDiscussionDetail(discussionId);
         
-        if (response.status === 'success') {
-          this.currentDiscussion = response.data.discussion || {};
+        if (response.status === 'ok') {
+          this.currentDiscussion = response.discussion || {};
           this.detailDialogVisible = true;
           
           // 获取讨论回复
@@ -320,8 +320,8 @@ export default {
       try {
         const response = await getDiscussionReplies(discussionId);
         
-        if (response.status === 'success') {
-          this.replies = response.data.replies || [];
+        if (response.status === 'ok') {
+          this.replies = response.replies || [];
         } else {
           this.$message.error(response.message || '获取回复失败');
         }
@@ -344,7 +344,7 @@ export default {
           content: this.replyContent
         });
         
-        if (response.status === 'success') {
+        if (response.status === 'ok') {
           this.$message.success('回复成功');
           this.replyContent = '';
           // 刷新回复列表
@@ -386,7 +386,7 @@ export default {
           parent_id: this.currentParentId
         });
         
-        if (response.status === 'success') {
+        if (response.status === 'ok') {
           this.$message.success('回复成功');
           this.replyDialogVisible = false;
           // 刷新回复列表
