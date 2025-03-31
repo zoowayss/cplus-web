@@ -46,6 +46,13 @@ public:
     
     // 计算用户的通过率
     static float getUserAcceptanceRate(int user_id);
+    
+    // 更新提交状态
+    static bool updateSubmissionStatus(int submission_id, JudgeResult result);
+    
+    // 评测线程管理
+    static void ensureJudgeThreadRunning();
+    static void stopJudgeThread();
 
 private:
     // 验证提交数据
@@ -53,9 +60,6 @@ private:
     
     // 准备用于评测的提交
     static bool prepareSubmissionForJudge(int submission_id);
-    
-    // 更新提交状态
-    static bool updateSubmissionStatus(int submission_id, JudgeResult result);
 };
 
 #endif // SUBMISSION_SERVICE_H 

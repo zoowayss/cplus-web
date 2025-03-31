@@ -64,7 +64,7 @@ std::vector<Problem> ProblemService::getAllProblems(int offset, int limit, const
     
     try {
         std::stringstream sql;
-        sql << "SELECT id, title, description, input_format, output_format, difficulty, "
+        sql << "SELECT id, title, description, code_template, input_format, output_format, difficulty, "
             << "time_limit, memory_limit, example_input, example_output, hint, "
             << "created_by, created_at, updated_at, status "
             << "FROM problems WHERE 1=1 ";
@@ -92,6 +92,7 @@ std::vector<Problem> ProblemService::getAllProblems(int offset, int limit, const
             problem.setId(std::stoi(row[col++]));
             problem.setTitle(row[col++] ? row[col-1] : "");
             problem.setDescription(row[col++] ? row[col-1] : "");
+            problem.setCodeTemplate(row[col++] ? row[col-1] : "");
             problem.setInputFormat(row[col++] ? row[col-1] : "");
             problem.setOutputFormat(row[col++] ? row[col-1] : "");
             problem.setDifficulty(row[col++] ? row[col-1] : "中等");
@@ -124,7 +125,7 @@ Problem ProblemService::getProblemById(int problem_id, bool with_testcases) {
     try {
         std::cout << "正在构建查询SQL..." << std::endl;
         std::stringstream sql;
-        sql << "SELECT id, title, description, input_format, output_format, difficulty, "
+        sql << "SELECT id, title, description, code_template, input_format, output_format, difficulty, "
             << "time_limit, memory_limit, example_input, example_output, hint, "
             << "created_by, created_at, updated_at, status "
             << "FROM problems WHERE id = " << problem_id;
@@ -148,6 +149,7 @@ Problem ProblemService::getProblemById(int problem_id, bool with_testcases) {
             problem.setId(std::stoi(row[col++]));
             problem.setTitle(row[col++] ? row[col-1] : "");
             problem.setDescription(row[col++] ? row[col-1] : "");
+            problem.setCodeTemplate(row[col++] ? row[col-1] : "");
             problem.setInputFormat(row[col++] ? row[col-1] : "");
             problem.setOutputFormat(row[col++] ? row[col-1] : "");
             problem.setDifficulty(row[col++] ? row[col-1] : "中等");
@@ -197,11 +199,12 @@ bool ProblemService::createProblem(const Problem& problem, std::string& error_me
     int64_t now = std::time(nullptr);
     
     std::stringstream sql;
-    sql << "INSERT INTO problems (title, description, input_format, output_format, difficulty, "
+    sql << "INSERT INTO problems (title, description, code_template, input_format, output_format, difficulty, "
         << "time_limit, memory_limit, example_input, example_output, hint, "
         << "created_by, created_at, updated_at, status) VALUES ("
         << "'" << db->escapeString(problem.getTitle()) << "', "
         << "'" << db->escapeString(problem.getDescription()) << "', "
+        << "'" << db->escapeString(problem.getCodeTemplate()) << "', "
         << "'" << db->escapeString(problem.getInputFormat()) << "', "
         << "'" << db->escapeString(problem.getOutputFormat()) << "', "
         << "'" << db->escapeString(problem.getDifficulty()) << "', "
@@ -255,6 +258,7 @@ bool ProblemService::updateProblem(const Problem& problem, std::string& error_me
     sql << "UPDATE problems SET "
         << "title = '" << db->escapeString(problem.getTitle()) << "', "
         << "description = '" << db->escapeString(problem.getDescription()) << "', "
+        << "code_template = '" << db->escapeString(problem.getCodeTemplate()) << "', "
         << "input_format = '" << db->escapeString(problem.getInputFormat()) << "', "
         << "output_format = '" << db->escapeString(problem.getOutputFormat()) << "', "
         << "difficulty = '" << db->escapeString(problem.getDifficulty()) << "', "

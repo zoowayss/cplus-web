@@ -19,11 +19,25 @@
           </el-select>
         </el-form-item>
         
+        <el-form-item label="提示 (可选)" prop="hint">
+          <el-input type="textarea" v-model="problemForm.hint" :rows="4" placeholder="请输入提示信息"></el-input>
+        </el-form-item>
+        
+        <el-form-item label="代码模板 (可选)" prop="code_template">
+          <el-input type="textarea" v-model="problemForm.code_template" :rows="8" placeholder="请输入用户代码模板，例如：class Solution { public: vector<int> twoSum(vector<int>& nums, int target) { // YOUR CODE HERE } };"></el-input>
+          <div class="form-tips">
+            代码模板将显示在用户提交页面中，可以使用"// YOUR CODE HERE"标记插入用户代码的位置。
+          </div>
+        </el-form-item>
+        
         <el-form-item label="状态" prop="status">
-          <el-radio-group v-model="problemForm.status">
-            <el-radio :label="1">启用</el-radio>
-            <el-radio :label="0">禁用</el-radio>
-          </el-radio-group>
+          <el-switch
+            v-model="problemForm.status"
+            :active-value="1"
+            :inactive-value="0"
+            active-text="启用"
+            inactive-text="禁用">
+          </el-switch>
         </el-form-item>
         
         <el-form-item label="时间限制" prop="time_limit">
@@ -127,6 +141,8 @@ export default {
   data() {
     return {
       loading: false,
+      submitting: false,
+      editorLoading: false,
       isEdit: false,
       problemId: null,
       activeTab: 'description',
@@ -141,6 +157,7 @@ export default {
         example_input: '',
         example_output: '',
         hint: '',
+        code_template: '',
         status: 1
       },
       rules: {
@@ -213,6 +230,7 @@ export default {
               example_input: problem.example_input || '',
               example_output: problem.example_output || '',
               hint: problem.hint || '',
+              code_template: problem.code_template || '',
               status: problem.status !== undefined ? problem.status : 1
             };
           } else {

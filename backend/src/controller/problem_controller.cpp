@@ -781,9 +781,7 @@ void ProblemController::handleSubmitCode(const http::Request& req, http::Respons
         
         sendSuccessResponse(res, "代码提交成功，正在评测", data);
         
-        // TODO: 异步调用判题系统进行评测
-        // 这里可以使用线程池或消息队列来实现异步评测
-        // 目前先使用同步方式作为示例
+        // 提交服务内部会将任务加入评测队列，无需在这里调用
         // SubmissionService::prepareSubmissionForJudge(submission.getId());
     } else {
         sendErrorResponse(res, "提交代码失败: " + error_message, 500);
@@ -898,7 +896,8 @@ void ProblemController::handleResubmitCode(const http::Request& req, http::Respo
         
         sendSuccessResponse(res, "重新提交成功，正在评测", data);
         
-        // TODO: 异步调用判题系统进行评测
+        // 提交服务内部会将任务加入评测队列，无需在这里调用
+        // SubmissionService::prepareSubmissionForJudge(newSubmission.getId());
     } else {
         sendErrorResponse(res, "重新提交失败: " + error_message, 500);
     }

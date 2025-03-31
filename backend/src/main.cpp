@@ -7,6 +7,7 @@
 #include "../include/http/http_server.h"
 #include "../include/utils/jwt.h"
 #include "../include/controller/controller_manager.h"
+#include "../include/services/submission_service.h"
 #include "../lib/jsoncpp/include/json/json.h"
 
 // 全局HTTP服务器实例
@@ -15,6 +16,10 @@ http::HttpServer* server = nullptr;
 // 信号处理函数，用于优雅地关闭服务器
 void signal_handler(int signal) {
     std::cout << "接收到信号 " << signal << "，正在关闭服务器..." << std::endl;
+    
+    // 停止评测线程
+    SubmissionService::stopJudgeThread();
+    
     if (server) {
         server->stop();
     }
@@ -55,6 +60,10 @@ int main(int argc, char** argv) {
     
     std::cout << "数据库连接成功" << std::endl;
     
+    // 启动评测线程
+    SubmissionService::ensureJudgeThreadRunning();
+    std::cout << "评测服务初始化完成" << std::endl;
+    
     // 创建HTTP服务器，使用httplib实现，监听指定端口
     server = new http::HttpServer(port);
     
@@ -91,6 +100,7 @@ int main(int argc, char** argv) {
         "title VARCHAR(255) NOT NULL,"
         "description TEXT NOT NULL,"
         "input_format TEXT NOT NULL,"
+        "code_template TEXT,"
         "output_format TEXT NOT NULL,"
         "difficulty ENUM('简单', '中等', '困难') NOT NULL DEFAULT '中等',"
         "time_limit INT NOT NULL DEFAULT 1000," // 默认1000ms
@@ -101,8 +111,7 @@ int main(int argc, char** argv) {
         "created_by INT NOT NULL,"
         "created_at BIGINT NOT NULL,"
         "updated_at BIGINT NOT NULL,"
-        "status TINYINT NOT NULL DEFAULT 1," // 1: 启用, 0: 禁用
-        "FOREIGN KEY (created_by) REFERENCES users(id)"
+        "status TINYINT NOT NULL DEFAULT 1" // 1: 启用, 0: 禁用
         ")";
 
     if (!db->executeCommand(create_problems_table)) {
@@ -119,8 +128,7 @@ int main(int argc, char** argv) {
         "input TEXT NOT NULL,"
         "expected_output TEXT NOT NULL,"
         "is_example BOOLEAN NOT NULL DEFAULT FALSE,"
-        "created_at BIGINT NOT NULL,"
-        "FOREIGN KEY (problem_id) REFERENCES problems(id) ON DELETE CASCADE"
+        "created_at BIGINT NOT NULL"
         ")";
     
     if (!db->executeCommand(create_testcases_table)) {
@@ -143,9 +151,7 @@ int main(int argc, char** argv) {
         "memory_used INT DEFAULT 0,"
         "error_message TEXT,"
         "created_at BIGINT NOT NULL,"
-        "judged_at BIGINT,"
-        "FOREIGN KEY (user_id) REFERENCES users(id),"
-        "FOREIGN KEY (problem_id) REFERENCES problems(id)"
+        "judged_at BIGINT"
         ")";
     
     if (!db->executeCommand(create_submissions_table)) {
@@ -163,8 +169,7 @@ int main(int argc, char** argv) {
         "result INT NOT NULL DEFAULT 0," // 同上result枚举
         "time_used INT DEFAULT 0,"
         "memory_used INT DEFAULT 0,"
-        "output TEXT,"
-        "FOREIGN KEY (submission_id) REFERENCES submissions(id) ON DELETE CASCADE"
+        "output TEXT"
         ")";
     
     if (!db->executeCommand(create_test_point_results_table)) {
@@ -184,9 +189,7 @@ int main(int argc, char** argv) {
         "views INT DEFAULT 0,"
         "likes INT DEFAULT 0,"
         "created_at BIGINT NOT NULL,"
-        "updated_at BIGINT NOT NULL,"
-        "FOREIGN KEY (problem_id) REFERENCES problems(id) ON DELETE CASCADE,"
-        "FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE"
+        "updated_at BIGINT NOT NULL"
         ")";
     
     if (!db->executeCommand(create_discussions_table)) {
@@ -205,9 +208,7 @@ int main(int argc, char** argv) {
         "content TEXT NOT NULL,"
         "likes INT DEFAULT 0,"
         "created_at BIGINT NOT NULL,"
-        "updated_at BIGINT NOT NULL,"
-        "FOREIGN KEY (discussion_id) REFERENCES discussions(id) ON DELETE CASCADE,"
-        "FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE"
+        "updated_at BIGINT NOT NULL"
         ")";
     
     if (!db->executeCommand(create_discussion_replies_table)) {
@@ -236,26 +237,37 @@ int main(int argc, char** argv) {
         std::cerr << "创建讨论回复表索引2失败，索引可能已存在" << std::endl;
     }
     
-    // 启动HTTP服务器
-    std::cout << "尝试启动HTTP服务器，监听端口: " << port << std::endl;
+    // 添加示例管理员帐户
+    if (!db->executeCommand("INSERT INTO `cplus`.`users` (`id`, `username`, `email`, `password_hash`, `salt`, `avatar`, `role`, `status`, `created_at`, `updated_at`, `last_login`) VALUES (2, 'admin', 'admin@c.cc', '75d369ed5cb43aa6cbb62c405dd582a0e8b43aa985c4cbc230515b1247365446', '81a275083037c1df028f804739fb445e', NULL, 2, 0, 1743239731, 1743392154, 1743392154)")) {
+        std::cerr << "无法插入示例管理员帐户" << std::endl;
+    }
+    
+    std::cout << "系统初始化完成，准备监听端口 " << port << std::endl;
+    
+    // 启动服务器
     if (!server->start()) {
         std::cerr << "HTTP服务器启动失败，端口 " << port << " 可能已被占用" << std::endl;
+        // 停止评测线程
+        SubmissionService::stopJudgeThread();
         delete server;
+        server = nullptr;
+        // 关闭数据库连接
         db->close();
         return 1;
     }
     
-    std::cout << "HTTP服务器已启动，监听端口: " << server->port() << std::endl;
+    std::cout << "HTTP服务器已启动，监听端口: " << port << std::endl;
     std::cout << "后端服务器正在运行..." << std::endl;
     std::cout << "按Ctrl+C终止服务器..." << std::endl;
     
-    // httplib 服务器是阻塞的，所以不需要额外的循环来保持主线程活动
-    // 程序会在这里阻塞，直到服务器停止
+    // 服务器停止后的清理工作
+    std::cout << "服务器已停止，正在进行清理..." << std::endl;
+
+    // 停止评测线程（以防信号处理函数没有被调用）
+    SubmissionService::stopJudgeThread();
     
-    // 如果代码执行到这里，说明服务器已经停止
-    if (server) {
-        delete server;
-    }
+    delete server;
+    server = nullptr;
     
     // 关闭数据库连接
     db->close();

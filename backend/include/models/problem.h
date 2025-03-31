@@ -48,6 +48,7 @@ private:
     std::string example_input;
     std::string example_output;
     std::string hint;
+    std::string code_template;
     int created_by;
     int64_t created_at;
     int64_t updated_at;
@@ -92,6 +93,9 @@ public:
     const std::string& getHint() const { return hint; }
     void setHint(const std::string& value) { hint = value; }
     
+    const std::string& getCodeTemplate() const { return code_template; }
+    void setCodeTemplate(const std::string& value) { code_template = value; }
+    
     int getCreatedBy() const { return created_by; }
     void setCreatedBy(int value) { created_by = value; }
     
@@ -122,6 +126,7 @@ public:
         json["example_input"] = example_input;
         json["example_output"] = example_output;
         json["hint"] = hint;
+        json["code_template"] = code_template;
         json["created_by"] = created_by;
         json["created_at"] = Json::Int64(created_at);
         json["updated_at"] = Json::Int64(updated_at);
@@ -152,6 +157,7 @@ public:
         if (json.isMember("example_input")) problem.setExampleInput(json["example_input"].asString());
         if (json.isMember("example_output")) problem.setExampleOutput(json["example_output"].asString());
         if (json.isMember("hint")) problem.setHint(json["hint"].asString());
+        if (json.isMember("code_template")) problem.setCodeTemplate(json["code_template"].asString());
         if (json.isMember("created_by")) problem.setCreatedBy(json["created_by"].asInt());
         if (json.isMember("created_at")) problem.setCreatedAt(json["created_at"].asInt64());
         if (json.isMember("updated_at")) problem.setUpdatedAt(json["updated_at"].asInt64());

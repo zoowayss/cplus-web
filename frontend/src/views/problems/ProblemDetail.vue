@@ -45,6 +45,7 @@
               <CodeSubmission 
                 :code.sync="code"
                 :submitting="submitting"
+                :problem="problem"
                 @submit="submitCode"
               />
             </el-tab-pane>

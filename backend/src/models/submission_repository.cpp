@@ -8,6 +8,12 @@
 bool SubmissionRepository::createSubmission(Submission& submission) {
     Database* db = Database::getInstance();
     
+    // 检查数据库连接是否正常
+    if (!db->isConnected()) {
+        std::cerr << "创建提交记录失败: 数据库连接未初始化" << std::endl;
+        return false;
+    }
+    
     std::stringstream sql;
     sql << "INSERT INTO submissions (user_id, problem_id, language, source_code, "
         << "result, score, time_used, memory_used, error_message, created_at) VALUES ("
@@ -22,13 +28,76 @@ bool SubmissionRepository::createSubmission(Submission& submission) {
         << "'" << db->escapeString(submission.getErrorMessage()) << "', "
         << time(nullptr) << ")";
     
+    std::cout << "准备执行SQL: " << sql.str() << std::endl;
+    
     if (!db->executeCommand(sql.str())) {
-        std::cerr << "创建提交记录失败" << std::endl;
+        std::cerr << "创建提交记录失败: 执行SQL命令时出错" << std::endl;
         return false;
     }
     
-    // 设置新创建的提交记录ID
-    submission.setId(db->getLastInsertId());
+    // 使用LAST_INSERT_ID()函数确保获取正确的ID
+    std::string query = "SELECT LAST_INSERT_ID() as last_id";
+    MYSQL_RES* idResult = db->executeQuery(query);
+    
+    if (!idResult) {
+        std::cerr << "创建提交记录失败: 无法获取LAST_INSERT_ID()" << std::endl;
+        return false;
+    }
+    
+    MYSQL_ROW row = mysql_fetch_row(idResult);
+    unsigned long long lastId = 0;
+    
+    if (row && row[0]) {
+        lastId = std::stoull(row[0]);
+        std::cout << "通过LAST_INSERT_ID()获取的ID: " << lastId << std::endl;
+    } else {
+        std::cerr << "创建提交记录失败: LAST_INSERT_ID()返回空值" << std::endl;
+        mysql_free_result(idResult);
+        return false;
+    }
+    
+    mysql_free_result(idResult);
+    
+    // 如果LAST_INSERT_ID()方法获取失败，尝试使用getLastInsertId()方法
+    if (lastId <= 0) {
+        lastId = db->getLastInsertId();
+        std::cout << "通过getLastInsertId()获取的ID: " << lastId << std::endl;
+    }
+    
+    if (lastId <= 0) {
+        std::cerr << "创建提交记录失败: 获取到无效的LastInsertId" << std::endl;
+        return false;
+    }
+    
+    // 执行查询确认记录是否存在
+    std::stringstream checkSql;
+    checkSql << "SELECT id, user_id, problem_id FROM submissions WHERE id = " << lastId;
+    std::cout << "执行确认查询: " << checkSql.str() << std::endl;
+    
+    MYSQL_RES* result = db->executeQuery(checkSql.str());
+    
+    if (!result) {
+        std::cerr << "创建提交记录失败: 无法确认新记录是否存在" << std::endl;
+        return false;
+    }
+    
+    MYSQL_ROW checkRow = mysql_fetch_row(result);
+    bool recordExists = checkRow != nullptr;
+    
+    if (recordExists) {
+        std::cout << "确认新记录存在，ID: " << checkRow[0] 
+                  << ", 用户ID: " << checkRow[1] 
+                  << ", 题目ID: " << checkRow[2] << std::endl;
+    } else {
+        std::cerr << "创建提交记录失败: 新记录不存在，可能是并发问题" << std::endl;
+        mysql_free_result(result);
+        return false;
+    }
+    
+    mysql_free_result(result);
+    
+    submission.setId(lastId);
+    std::cout << "提交记录创建成功，并设置ID为: " << lastId << std::endl;
     return true;
 }
 

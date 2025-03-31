@@ -72,7 +72,7 @@ void UserController::handleRegister(const http::Request& req, http::Response& re
     std::string email = reqJson["email"].asString();
     std::string error_message;
     
-    bool success = UserService::registerUser(username, password, email, error_message);
+    bool success = UserService::registerUser(username, email, password, error_message);
     
     if (success) {
         sendSuccessResponse(res, "注册成功，请登录");

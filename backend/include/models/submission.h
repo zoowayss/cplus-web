@@ -35,6 +35,7 @@ private:
     int submission_id;           // 提交ID
     int test_case_id;            // 测试用例ID
     JudgeResult result;          // 评测结果
+    bool passed;                 // 是否通过
     int time_used;               // 耗时（毫秒）
     int memory_used;             // 内存使用（KB）
     std::string output;          // 实际输出
@@ -50,6 +51,7 @@ public:
     int getSubmissionId() const;
     int getTestCaseId() const;
     JudgeResult getResult() const;
+    bool getPassed() const;
     int getTimeUsed() const;
     int getMemoryUsed() const;
     std::string getOutput() const;
@@ -60,6 +62,7 @@ public:
     void setSubmissionId(int submission_id);
     void setTestCaseId(int test_case_id);
     void setResult(JudgeResult result);
+    void setPassed(bool passed);
     void setTimeUsed(int time_used);
     void setMemoryUsed(int memory_used);
     void setOutput(const std::string& output);

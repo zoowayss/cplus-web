@@ -3,16 +3,17 @@
 #include <iostream>
 
 // 测试点结果类构造函数
-TestPointResult::TestPointResult() : id(0), submission_id(0), test_case_id(0), result(JudgeResult::PENDING), time_used(0), memory_used(0) {}
+TestPointResult::TestPointResult() : id(0), submission_id(0), test_case_id(0), result(JudgeResult::PENDING), passed(false), time_used(0), memory_used(0) {}
 
 TestPointResult::TestPointResult(int submission_id, int test_case_id) 
-    : id(0), submission_id(submission_id), test_case_id(test_case_id), result(JudgeResult::PENDING), time_used(0), memory_used(0) {}
+    : id(0), submission_id(submission_id), test_case_id(test_case_id), result(JudgeResult::PENDING), passed(false), time_used(0), memory_used(0) {}
 
 // Getters
 int TestPointResult::getId() const { return id; }
 int TestPointResult::getSubmissionId() const { return submission_id; }
 int TestPointResult::getTestCaseId() const { return test_case_id; }
 JudgeResult TestPointResult::getResult() const { return result; }
+bool TestPointResult::getPassed() const { return passed; }
 int TestPointResult::getTimeUsed() const { return time_used; }
 int TestPointResult::getMemoryUsed() const { return memory_used; }
 std::string TestPointResult::getOutput() const { return output; }
@@ -23,6 +24,7 @@ void TestPointResult::setId(int id) { this->id = id; }
 void TestPointResult::setSubmissionId(int submission_id) { this->submission_id = submission_id; }
 void TestPointResult::setTestCaseId(int test_case_id) { this->test_case_id = test_case_id; }
 void TestPointResult::setResult(JudgeResult result) { this->result = result; }
+void TestPointResult::setPassed(bool passed) { this->passed = passed; }
 void TestPointResult::setTimeUsed(int time_used) { this->time_used = time_used; }
 void TestPointResult::setMemoryUsed(int memory_used) { this->memory_used = memory_used; }
 void TestPointResult::setOutput(const std::string& output) { this->output = output; }
@@ -42,6 +44,7 @@ Json::Value TestPointResult::toJson() const {
     root["submission_id"] = submission_id;
     root["test_case_id"] = test_case_id;
     root["result"] = static_cast<int>(result);
+    root["passed"] = passed;
     root["time_used"] = time_used;
     root["memory_used"] = memory_used;
     root["output"] = output;
