@@ -8,7 +8,7 @@
 #include "../include/utils/jwt.h"
 #include "../include/controller/controller_manager.h"
 #include "../include/services/submission_service.h"
-#include "../lib/jsoncpp/include/json/json.h"
+#include <json/json.h>
 
 // 全局HTTP服务器实例
 http::HttpServer* server = nullptr;

@@ -22,6 +22,13 @@ else
     fi
 fi
 
+# 查找并替换所有对lib目录的引用
+echo "检查并修复源代码中对lib目录的引用..."
+
+# 查找并替换所有对lib/jsoncpp的引用
+find src include -type f -name "*.cpp" -o -name "*.h" | xargs -I{} sed -i 's|"../lib/jsoncpp/include/json/json.h"|<json/json.h>|g' {}
+find src include -type f -name "*.cpp" -o -name "*.h" | xargs -I{} sed -i 's|"../../lib/jsoncpp/include/json/json.h"|<json/json.h>|g' {}
+
 # 编译项目
 echo "编译项目..."
 make clean && make
