@@ -6,7 +6,8 @@
 #include <map>
 #include <memory>
 #include <iostream>
-#include <httplib.h>
+// 使用项目include目录中的httplib库
+#include "../httplib/httplib.h"
 #include <json/json.h>
 
 namespace http {

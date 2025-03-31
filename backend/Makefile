@@ -55,22 +55,8 @@ else
     JSON_LIB = -L/usr/lib -L/usr/lib/x86_64-linux-gnu -ljsoncpp
 endif
 
-# HTTP 库设置
-ifeq ($(UNAME_S),Darwin)
-    # macOS
-    HTTP_INCLUDE = -I/usr/local/include -I/opt/homebrew/include
-else ifeq ($(IS_CENTOS),1)
-    # CentOS/RHEL - 优先使用系统路径，如果没有则使用自带的lib库
-    HTTP_INCLUDE = -I/usr/local/include -I/usr/include
-    # 如果需要使用原有lib目录中的cpp-httplib库，取消下面这行的注释
-    # HTTP_INCLUDE = -I$(shell pwd)/lib/cpp-httplib
-else
-    # 其他Linux
-    HTTP_INCLUDE = -I/usr/include
-endif
-
-# 包含目录
-INCLUDES = -Iinclude $(MYSQL_INCLUDE) $(OPENSSL_INCLUDE) $(JSON_INCLUDE) $(HTTP_INCLUDE)
+# 包含目录 - 只使用include目录，不依赖lib目录
+INCLUDES = -Iinclude $(MYSQL_INCLUDE) $(OPENSSL_INCLUDE) $(JSON_INCLUDE)
 
 # 主目标
 cplus_online_judge_backend: $(SRCS)
