@@ -6,8 +6,8 @@
 #include <map>
 #include <memory>
 #include <iostream>
-#include "../../lib/cpp-httplib/httplib.h"
-#include "../../lib/jsoncpp/include/json/json.h"
+#include <httplib.h>
+#include <json/json.h>
 
 namespace http {
     

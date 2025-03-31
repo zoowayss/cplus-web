@@ -55,11 +55,22 @@ else
     JSON_LIB = -L/usr/lib -L/usr/lib/x86_64-linux-gnu -ljsoncpp
 endif
 
-# HTTP 库设置 - 使用系统安装的库而非lib目录中的库
-# 在CentOS上安装依赖: sudo yum install jsoncpp-devel openssl-devel mysql-devel
+# HTTP 库设置
+ifeq ($(UNAME_S),Darwin)
+    # macOS
+    HTTP_INCLUDE = -I/usr/local/include -I/opt/homebrew/include
+else ifeq ($(IS_CENTOS),1)
+    # CentOS/RHEL - 优先使用系统路径，如果没有则使用自带的lib库
+    HTTP_INCLUDE = -I/usr/local/include -I/usr/include
+    # 如果需要使用原有lib目录中的cpp-httplib库，取消下面这行的注释
+    # HTTP_INCLUDE = -I$(shell pwd)/lib/cpp-httplib
+else
+    # 其他Linux
+    HTTP_INCLUDE = -I/usr/include
+endif
 
-# 包含目录 - 移除对lib目录的引用
-INCLUDES = -Iinclude $(MYSQL_INCLUDE) $(OPENSSL_INCLUDE) $(JSON_INCLUDE)
+# 包含目录
+INCLUDES = -Iinclude $(MYSQL_INCLUDE) $(OPENSSL_INCLUDE) $(JSON_INCLUDE) $(HTTP_INCLUDE)
 
 # 主目标
 cplus_online_judge_backend: $(SRCS)

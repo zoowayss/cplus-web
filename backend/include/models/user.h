@@ -4,6 +4,7 @@
 #include <string>
 #include <map>
 #include <ctime>
+#include <vector>
 
 // 用户状态枚举
 enum class UserStatus {
