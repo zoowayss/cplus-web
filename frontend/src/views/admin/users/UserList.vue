@@ -291,7 +291,11 @@ export default {
       this.listLoading = true
       const offset = (this.listQuery.page - 1) * this.listQuery.limit
       
-      getUserList(offset, this.listQuery.limit, this.listQuery.search, this.listQuery.role, this.listQuery.status)
+      // 修正API参数传递，确保无论是数字还是空字符串都能正确传递
+      const role = this.listQuery.role === '' ? '' : Number(this.listQuery.role)
+      const status = this.listQuery.status === '' ? '' : Number(this.listQuery.status)
+      
+      getUserList(offset, this.listQuery.limit, this.listQuery.search, role, status)
         .then(response => {
           this.userList = response.users
           this.total = response.total

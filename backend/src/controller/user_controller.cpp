@@ -381,11 +381,16 @@ void UserController::handleGetAllUsers(const http::Request& req, http::Response&
     int status_filter = -1;
     
     // 解析查询字符串
+    std::string query_string;
     std::string path = req.path;
+    // log path
+    std::cout << "path: " << path << std::endl;
     size_t pos = path.find('?');
     if (pos != std::string::npos) {
-        std::string query = path.substr(pos + 1);
-        std::istringstream ss(query);
+        query_string = path.substr(pos + 1);
+        
+        // 分割查询参数
+        std::istringstream ss(query_string);
         std::string param;
         
         while (std::getline(ss, param, '&')) {
@@ -394,24 +399,52 @@ void UserController::handleGetAllUsers(const http::Request& req, http::Response&
                 std::string key = param.substr(0, equal_pos);
                 std::string value = param.substr(equal_pos + 1);
                 
+                // URL解码参数值（如果需要）
+                // 这里可以添加URL解码逻辑
+                
                 try {
-                    if (key == "offset" && !value.empty()) {
-                        offset = std::stoi(value);
-                    } else if (key == "limit" && !value.empty()) {
-                        limit = std::stoi(value);
-                    } else if (key == "search" && !value.empty()) {
+                    if (key == "offset") {
+                        if (!value.empty()) {
+                            offset = std::stoi(value);
+                        }
+                    } else if (key == "limit") {
+                        if (!value.empty()) {
+                            limit = std::stoi(value);
+                        }
+                    } else if (key == "search") {
                         search_term = value;
-                    } else if (key == "role" && !value.empty()) {
-                        role_filter = std::stoi(value);
-                    } else if (key == "status" && !value.empty()) {
-                        status_filter = std::stoi(value);
+                    } else if (key == "role") {
+                        if (!value.empty()) {
+                            // 明确处理role=0的情况
+                            if (value == "0") {
+                                role_filter = 0;
+                            } else {
+                                role_filter = std::stoi(value);
+                            }
+                        }
+                    } else if (key == "status") {
+                        if (!value.empty()) {
+                            // 明确处理status=0的情况
+                            if (value == "0") {
+                                status_filter = 0;
+                            } else {
+                                status_filter = std::stoi(value);
+                            }
+                        }
                     }
-                } catch (...) {
-                    // 忽略转换错误，使用默认值
+                } catch (const std::exception& e) {
+                    // 记录转换错误并使用默认值
+                    std::cerr << "参数转换错误: " << key << "=" << value 
+                              << " 错误: " << e.what() << std::endl;
                 }
             }
         }
     }
+    
+    // 输出日志，便于调试
+    std::cout << "用户列表请求参数: offset=" << offset << ", limit=" << limit 
+              << ", search=" << search_term << ", role=" << role_filter 
+              << ", status=" << status_filter << std::endl;
     
     // 获取用户列表
     Json::Value users_data;

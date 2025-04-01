@@ -24,7 +24,12 @@ namespace http {
         static Request from_httplib(const httplib::Request& req) {
             Request new_req;
             new_req.method = req.method;
-            new_req.path = req.path;
+            // 将查询参数转换为字符串
+            std::string query_string;
+            for (const auto& param : req.params) {
+                query_string += param.first + "=" + param.second + "&";
+            }
+            new_req.path = req.path+"?"+query_string;
             new_req.http_version = "HTTP/1.1"; // httplib 默认使用 HTTP/1.1
             new_req.body = req.body;
             

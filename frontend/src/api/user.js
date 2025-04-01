@@ -38,10 +38,21 @@ export function logout() {
 
 // 获取用户列表
 export function getUserList(offset = 0, limit = 10, search = '', role = '', status = '') {
+  const params = { offset, limit, search };
+  
+  // 只有当role和status有值时才添加到params对象中
+  if (role !== '') {
+    params.role = role;
+  }
+  
+  if (status !== '') {
+    params.status = status;
+  }
+  
   return request({
     url: '/api/admin/users',
     method: 'get',
-    params: { offset, limit, search, role, status }
+    params
   })
 }
 
