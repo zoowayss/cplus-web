@@ -102,6 +102,18 @@ const routes = [
         name: 'AdminUserList',
         component: () => import('../views/admin/users/UserList.vue'),
         meta: { title: '用户管理', requiresAuth: true, requiresAdmin: true }
+      },
+      {
+        path: 'submissions',
+        name: 'AdminSubmissionList',
+        component: () => import('../views/admin/submissions/SubmissionList.vue'),
+        meta: { title: '提交记录管理', requiresAuth: true, requiresAdmin: true }
+      },
+      {
+        path: 'submissions/:id',
+        name: 'AdminSubmissionDetail',
+        component: () => import('../views/admin/submissions/SubmissionDetail.vue'),
+        meta: { title: '提交记录详情', requiresAuth: true, requiresAdmin: true }
       }
     ]
   },

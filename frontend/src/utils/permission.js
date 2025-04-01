@@ -64,7 +64,8 @@ router.beforeEach((to, from, next) => {
       '/admin/settings'
     ].includes(path) || 
     path.match(/^\/admin\/problems\/edit\/\d+$/) || 
-    path.match(/^\/admin\/problems\/testcases\/\d+$/);
+    path.match(/^\/admin\/problems\/testcases\/\d+$/) ||
+    path.match(/^\/admin\/submissions\/\d+$/);
     
     if (!isValidAdminSubroute) {
       next('/admin');
