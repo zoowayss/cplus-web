@@ -44,6 +44,43 @@ void UserController::registerRoutes(http::HttpServer* server) {
     server->get("/api/user/problem-status", middleware::AuthMiddleware::protect([this](const http::Request& req, http::Response& res) {
         this->handleGetProblemStatus(req, res);
     }));
+    
+    // ===== 管理员用户管理相关路由 =====
+    
+    // 获取所有用户列表路由 - 需要管理员权限
+    server->get("/api/admin/users", middleware::AuthMiddleware::protectWithRole([this](const http::Request& req, http::Response& res) {
+        this->handleGetAllUsers(req, res);
+    }, static_cast<int>(UserRole::ADMIN)));
+    
+    // 创建用户路由 - 需要管理员权限
+    server->post("/api/admin/users", middleware::AuthMiddleware::protectWithRole([this](const http::Request& req, http::Response& res) {
+        this->handleCreateUser(req, res);
+    }, static_cast<int>(UserRole::ADMIN)));
+    
+    // 更新用户信息路由 - 需要管理员权限
+    server->put("/api/admin/users/:id", middleware::AuthMiddleware::protectWithRole([this](const http::Request& req, http::Response& res) {
+        this->handleUpdateUser(req, res);
+    }, static_cast<int>(UserRole::ADMIN)));
+    
+    // 删除用户路由 - 需要管理员权限
+    server->del("/api/admin/users/:id", middleware::AuthMiddleware::protectWithRole([this](const http::Request& req, http::Response& res) {
+        this->handleDeleteUser(req, res);
+    }, static_cast<int>(UserRole::ADMIN)));
+    
+    // 更改用户角色路由 - 需要管理员权限
+    server->post("/api/admin/users/:id/role", middleware::AuthMiddleware::protectWithRole([this](const http::Request& req, http::Response& res) {
+        this->handleChangeUserRole(req, res);
+    }, static_cast<int>(UserRole::ADMIN)));
+    
+    // 更改用户状态路由 - 需要管理员权限
+    server->post("/api/admin/users/:id/status", middleware::AuthMiddleware::protectWithRole([this](const http::Request& req, http::Response& res) {
+        this->handleChangeUserStatus(req, res);
+    }, static_cast<int>(UserRole::ADMIN)));
+    
+    // 重置用户密码路由 - 需要管理员权限
+    server->post("/api/admin/users/:id/reset_password", middleware::AuthMiddleware::protectWithRole([this](const http::Request& req, http::Response& res) {
+        this->handleResetUserPassword(req, res);
+    }, static_cast<int>(UserRole::ADMIN)));
 }
 
 // 用户登录处理
@@ -327,6 +364,367 @@ void UserController::handleGetProblemStatus(const http::Request& req, http::Resp
     
     if (success) {
         sendSuccessResponse(res, "获取题目状态成功", status_data);
+    } else {
+        sendErrorResponse(res, error_message, 400);
+    }
+}
+
+// ===== 管理员用户管理相关处理函数 =====
+
+// 获取所有用户列表
+void UserController::handleGetAllUsers(const http::Request& req, http::Response& res) {
+    // 解析URL查询参数
+    int offset = 0;
+    int limit = 10;
+    std::string search_term = "";
+    int role_filter = -1;
+    int status_filter = -1;
+    
+    // 解析查询字符串
+    std::string path = req.path;
+    size_t pos = path.find('?');
+    if (pos != std::string::npos) {
+        std::string query = path.substr(pos + 1);
+        std::istringstream ss(query);
+        std::string param;
+        
+        while (std::getline(ss, param, '&')) {
+            size_t equal_pos = param.find('=');
+            if (equal_pos != std::string::npos) {
+                std::string key = param.substr(0, equal_pos);
+                std::string value = param.substr(equal_pos + 1);
+                
+                try {
+                    if (key == "offset" && !value.empty()) {
+                        offset = std::stoi(value);
+                    } else if (key == "limit" && !value.empty()) {
+                        limit = std::stoi(value);
+                    } else if (key == "search" && !value.empty()) {
+                        search_term = value;
+                    } else if (key == "role" && !value.empty()) {
+                        role_filter = std::stoi(value);
+                    } else if (key == "status" && !value.empty()) {
+                        status_filter = std::stoi(value);
+                    }
+                } catch (...) {
+                    // 忽略转换错误，使用默认值
+                }
+            }
+        }
+    }
+    
+    // 获取用户列表
+    Json::Value users_data;
+    int total = 0;
+    std::string error_message;
+    
+    bool success = UserService::getAllUsers(offset, limit, search_term, 
+                                           role_filter, status_filter, 
+                                           users_data, total, error_message);
+    
+    if (success) {
+        Json::Value data;
+        data["users"] = users_data;
+        data["total"] = total;
+        data["offset"] = offset;
+        data["limit"] = limit;
+        
+        sendSuccessResponse(res, "获取用户列表成功", data);
+    } else {
+        sendErrorResponse(res, error_message, 400);
+    }
+}
+
+// 创建用户（管理员）
+void UserController::handleCreateUser(const http::Request& req, http::Response& res) {
+    Json::Value reqJson = parseRequestBody(req.body);
+    
+    if (!reqJson.isMember("username") || !reqJson.isMember("password") || 
+        !reqJson.isMember("email") || !reqJson.isMember("role")) {
+        sendErrorResponse(res, "请提供用户名、密码、邮箱和角色", 400);
+        return;
+    }
+    
+    std::string username = reqJson["username"].asString();
+    std::string password = reqJson["password"].asString();
+    std::string email = reqJson["email"].asString();
+    int role = reqJson["role"].asInt();
+    std::string error_message;
+    
+    bool success = UserService::createUserByAdmin(username, password, email, role, error_message);
+    
+    if (success) {
+        sendSuccessResponse(res, "创建用户成功");
+    } else {
+        sendErrorResponse(res, error_message, 400);
+    }
+}
+
+// 更新用户信息（管理员）
+void UserController::handleUpdateUser(const http::Request& req, http::Response& res) {
+    // 从URL路径获取用户ID
+    std::string path = req.path;
+    size_t last_slash_pos = path.find_last_of('/');
+    
+    if (last_slash_pos == std::string::npos || last_slash_pos == path.length() - 1) {
+        sendErrorResponse(res, "无效的用户ID", 400);
+        return;
+    }
+    
+    std::string id_str = path.substr(last_slash_pos + 1);
+    // 从ID字符串中移除查询参数（如果有）
+    size_t query_pos = id_str.find('?');
+    if (query_pos != std::string::npos) {
+        id_str = id_str.substr(0, query_pos);
+    }
+    
+    int user_id;
+    try {
+        user_id = std::stoi(id_str);
+    } catch (...) {
+        sendErrorResponse(res, "无效的用户ID", 400);
+        return;
+    }
+    
+    // 解析请求体
+    Json::Value reqJson = parseRequestBody(req.body);
+    std::string error_message;
+    
+    // 调用更新用户服务
+    bool success = UserService::updateUserByAdmin(user_id, reqJson, error_message);
+    
+    if (success) {
+        // 获取更新后的用户信息
+        User user = UserService::getUserInfo(user_id);
+        
+        // 将用户信息添加到响应中
+        Json::Value userJson = parseRequestBody(user.toJson());
+        Json::Value data;
+        data["user"] = userJson;
+        
+        sendSuccessResponse(res, "用户信息更新成功", data);
+    } else {
+        sendErrorResponse(res, error_message, 400);
+    }
+}
+
+// 删除用户（管理员）
+void UserController::handleDeleteUser(const http::Request& req, http::Response& res) {
+    // 从URL路径获取用户ID
+    std::string path = req.path;
+    size_t last_slash_pos = path.find_last_of('/');
+    
+    if (last_slash_pos == std::string::npos || last_slash_pos == path.length() - 1) {
+        sendErrorResponse(res, "无效的用户ID", 400);
+        return;
+    }
+    
+    std::string id_str = path.substr(last_slash_pos + 1);
+    // 从ID字符串中移除查询参数（如果有）
+    size_t query_pos = id_str.find('?');
+    if (query_pos != std::string::npos) {
+        id_str = id_str.substr(0, query_pos);
+    }
+    
+    int user_id;
+    try {
+        user_id = std::stoi(id_str);
+    } catch (...) {
+        sendErrorResponse(res, "无效的用户ID", 400);
+        return;
+    }
+    
+    // 获取当前操作用户ID以确保不删除自己
+    std::string auth_header = req.get_header("Authorization");
+    std::string token = auth_header.substr(7);
+    int current_user_id = JWT::getUserIdFromToken(token);
+    
+    if (user_id == current_user_id) {
+        sendErrorResponse(res, "不能删除自己的账户", 400);
+        return;
+    }
+    
+    // 调用删除用户服务
+    std::string error_message;
+    bool success = UserService::deleteUser(user_id, error_message);
+    
+    if (success) {
+        sendSuccessResponse(res, "用户删除成功");
+    } else {
+        sendErrorResponse(res, error_message, 400);
+    }
+}
+
+// 更改用户角色（管理员）
+void UserController::handleChangeUserRole(const http::Request& req, http::Response& res) {
+    // 从URL路径获取用户ID
+    std::string path = req.path;
+    size_t last_slash_pos = path.find_last_of('/');
+    
+    if (last_slash_pos == std::string::npos || last_slash_pos == path.length() - 1) {
+        sendErrorResponse(res, "无效的用户ID", 400);
+        return;
+    }
+    
+    std::string id_part = path.substr(0, last_slash_pos);
+    size_t user_id_pos = id_part.find_last_of('/');
+    
+    if (user_id_pos == std::string::npos || user_id_pos == id_part.length() - 1) {
+        sendErrorResponse(res, "无效的用户ID", 400);
+        return;
+    }
+    
+    std::string id_str = id_part.substr(user_id_pos + 1);
+    int user_id;
+    try {
+        user_id = std::stoi(id_str);
+    } catch (...) {
+        sendErrorResponse(res, "无效的用户ID", 400);
+        return;
+    }
+    
+    // 获取当前操作用户ID以确保不更改自己的角色
+    std::string auth_header = req.get_header("Authorization");
+    std::string token = auth_header.substr(7);
+    int current_user_id = JWT::getUserIdFromToken(token);
+    
+    if (user_id == current_user_id) {
+        sendErrorResponse(res, "不能更改自己的角色", 400);
+        return;
+    }
+    
+    // 解析请求体
+    Json::Value reqJson = parseRequestBody(req.body);
+    
+    if (!reqJson.isMember("role")) {
+        sendErrorResponse(res, "请提供角色值", 400);
+        return;
+    }
+    
+    int role = reqJson["role"].asInt();
+    if (role < 0 || role > 2) {
+        sendErrorResponse(res, "无效的角色值", 400);
+        return;
+    }
+    
+    // 调用更改用户角色服务
+    std::string error_message;
+    bool success = UserService::changeUserRole(user_id, static_cast<UserRole>(role), error_message);
+    
+    if (success) {
+        sendSuccessResponse(res, "用户角色更改成功");
+    } else {
+        sendErrorResponse(res, error_message, 400);
+    }
+}
+
+// 更改用户状态（管理员）
+void UserController::handleChangeUserStatus(const http::Request& req, http::Response& res) {
+    // 从URL路径获取用户ID
+    std::string path = req.path;
+    size_t last_slash_pos = path.find_last_of('/');
+    
+    if (last_slash_pos == std::string::npos || last_slash_pos == path.length() - 1) {
+        sendErrorResponse(res, "无效的用户ID", 400);
+        return;
+    }
+    
+    std::string id_part = path.substr(0, last_slash_pos);
+    size_t user_id_pos = id_part.find_last_of('/');
+    
+    if (user_id_pos == std::string::npos || user_id_pos == id_part.length() - 1) {
+        sendErrorResponse(res, "无效的用户ID", 400);
+        return;
+    }
+    
+    std::string id_str = id_part.substr(user_id_pos + 1);
+    int user_id;
+    try {
+        user_id = std::stoi(id_str);
+    } catch (...) {
+        sendErrorResponse(res, "无效的用户ID", 400);
+        return;
+    }
+    
+    // 获取当前操作用户ID以确保不更改自己的状态
+    std::string auth_header = req.get_header("Authorization");
+    std::string token = auth_header.substr(7);
+    int current_user_id = JWT::getUserIdFromToken(token);
+    
+    if (user_id == current_user_id) {
+        sendErrorResponse(res, "不能更改自己的状态", 400);
+        return;
+    }
+    
+    // 解析请求体
+    Json::Value reqJson = parseRequestBody(req.body);
+    
+    if (!reqJson.isMember("status")) {
+        sendErrorResponse(res, "请提供状态值", 400);
+        return;
+    }
+    
+    int status = reqJson["status"].asInt();
+    if (status < 0 || status > 2) {
+        sendErrorResponse(res, "无效的状态值", 400);
+        return;
+    }
+    
+    // 调用更改用户状态服务
+    std::string error_message;
+    bool success = UserService::changeUserStatus(user_id, static_cast<UserStatus>(status), error_message);
+    
+    if (success) {
+        sendSuccessResponse(res, "用户状态更改成功");
+    } else {
+        sendErrorResponse(res, error_message, 400);
+    }
+}
+
+// 重置用户密码（管理员）
+void UserController::handleResetUserPassword(const http::Request& req, http::Response& res) {
+    // 从URL路径获取用户ID
+    std::string path = req.path;
+    size_t last_slash_pos = path.find_last_of('/');
+    
+    if (last_slash_pos == std::string::npos || last_slash_pos == path.length() - 1) {
+        sendErrorResponse(res, "无效的用户ID", 400);
+        return;
+    }
+    
+    std::string id_part = path.substr(0, last_slash_pos);
+    size_t user_id_pos = id_part.find_last_of('/');
+    
+    if (user_id_pos == std::string::npos || user_id_pos == id_part.length() - 1) {
+        sendErrorResponse(res, "无效的用户ID", 400);
+        return;
+    }
+    
+    std::string id_str = id_part.substr(user_id_pos + 1);
+    int user_id;
+    try {
+        user_id = std::stoi(id_str);
+    } catch (...) {
+        sendErrorResponse(res, "无效的用户ID", 400);
+        return;
+    }
+    
+    // 解析请求体
+    Json::Value reqJson = parseRequestBody(req.body);
+    
+    if (!reqJson.isMember("new_password")) {
+        sendErrorResponse(res, "请提供新密码", 400);
+        return;
+    }
+    
+    std::string new_password = reqJson["new_password"].asString();
+    
+    // 调用重置密码服务
+    std::string error_message;
+    bool success = UserService::resetUserPassword(user_id, new_password, error_message);
+    
+    if (success) {
+        sendSuccessResponse(res, "用户密码重置成功");
     } else {
         sendErrorResponse(res, error_message, 400);
     }

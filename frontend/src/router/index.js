@@ -96,6 +96,12 @@ const routes = [
         name: 'AdminTestCases',
         component: () => import('../views/admin/problems/TestCaseManager.vue'),
         meta: { title: '测试用例管理', requiresAuth: true, requiresAdmin: true }
+      },
+      {
+        path: 'users',
+        name: 'AdminUserList',
+        component: () => import('../views/admin/users/UserList.vue'),
+        meta: { title: '用户管理', requiresAuth: true, requiresAdmin: true }
       }
     ]
   },

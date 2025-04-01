@@ -770,3 +770,381 @@ bool UserService::updateUserLeaderboardStats(int user_id, int problem_id, bool i
     // 执行更新并返回结果
     return db->executeCommand(update_query);
 }
+
+// ===== 管理员用户管理相关服务方法 =====
+
+// 获取所有用户（支持搜索和筛选）
+bool UserService::getAllUsers(int offset, int limit, const std::string& search_term, 
+                            int role_filter, int status_filter, Json::Value& user_data, 
+                            int& total, std::string& error_message) {
+    // 获取数据库连接
+    Database* db = Database::getInstance();
+    
+    // 构建查询条件
+    std::string where_clause = "WHERE 1=1 ";
+    
+    // 添加搜索条件
+    if (!search_term.empty()) {
+        where_clause += "AND (username LIKE '%" + search_term + "%' OR email LIKE '%" + search_term + "%') ";
+    }
+    
+    // 添加角色筛选
+    if (role_filter >= 0 && role_filter <= 2) {
+        where_clause += "AND role = " + std::to_string(role_filter) + " ";
+    }
+    
+    // 添加状态筛选
+    if (status_filter >= 0 && status_filter <= 2) {
+        where_clause += "AND status = " + std::to_string(status_filter) + " ";
+    }
+    
+    // 查询用户总数
+    std::string count_query = "SELECT COUNT(*) FROM users " + where_clause;
+    MYSQL_RES* count_result = db->executeQuery(count_query);
+    
+    if (!count_result) {
+        error_message = "获取用户列表失败，数据库错误";
+        return false;
+    }
+    
+    MYSQL_ROW count_row = mysql_fetch_row(count_result);
+    if (!count_row || !count_row[0]) {
+        mysql_free_result(count_result);
+        error_message = "获取用户列表失败，数据库错误";
+        return false;
+    }
+    
+    // 设置总用户数
+    total = std::stoi(count_row[0]);
+    mysql_free_result(count_result);
+    
+    // 如果没有用户，直接返回空数组
+    if (total == 0) {
+        user_data = Json::Value(Json::arrayValue);
+        return true;
+    }
+    
+    // 分页查询用户列表
+    std::string query = "SELECT * FROM users " + where_clause +
+                        "ORDER BY id DESC LIMIT " + std::to_string(limit) + 
+                        " OFFSET " + std::to_string(offset);
+    
+    MYSQL_RES* result = db->executeQuery(query);
+    
+    if (!result) {
+        error_message = "获取用户列表失败，数据库错误";
+        return false;
+    }
+    
+    // 处理查询结果
+    int num_rows = mysql_num_rows(result);
+    user_data = Json::Value(Json::arrayValue);
+    
+    for (int i = 0; i < num_rows; i++) {
+        User user = User::fromDatabaseResult(result, i);
+        
+        // 转换为JSON对象（不包含敏感信息）
+        Json::Value user_obj;
+        user_obj["id"] = user.getId();
+        user_obj["username"] = user.getUsername();
+        user_obj["email"] = user.getEmail();
+        user_obj["avatar"] = user.getAvatar();
+        user_obj["role"] = static_cast<int>(user.getRole());
+        user_obj["status"] = static_cast<int>(user.getStatus());
+        user_obj["created_at"] = static_cast<Json::Int64>(user.getCreatedAt());
+        user_obj["updated_at"] = static_cast<Json::Int64>(user.getUpdatedAt());
+        user_obj["last_login"] = static_cast<Json::Int64>(user.getLastLogin());
+        
+        user_data.append(user_obj);
+    }
+    
+    mysql_free_result(result);
+    return true;
+}
+
+// 通过管理员创建用户
+bool UserService::createUserByAdmin(const std::string& username, const std::string& password, 
+                                  const std::string& email, int role, std::string& error_message) {
+    // 验证用户名
+    if (!validateUsername(username)) {
+        error_message = "用户名格式不正确";
+        return false;
+    }
+    
+    // 验证邮箱
+    if (!validateEmail(email)) {
+        error_message = "邮箱格式不正确";
+        return false;
+    }
+    
+    // 验证密码
+    if (!validatePassword(password)) {
+        error_message = "密码长度不能少于6位";
+        return false;
+    }
+    
+    // 验证角色
+    if (role < 0 || role > 2) {
+        error_message = "角色值无效";
+        return false;
+    }
+    
+    // 检查用户名是否已存在
+    if (isUserExist(username)) {
+        error_message = "用户名已存在";
+        return false;
+    }
+    
+    // 检查邮箱是否已存在
+    if (isEmailExist(email)) {
+        error_message = "邮箱已注册";
+        return false;
+    }
+    
+    // 生成密码哈希和盐 - C++11兼容写法
+    std::pair<std::string, std::string> password_data = User::generatePasswordHash(password);
+    std::string password_hash = password_data.first;
+    std::string salt = password_data.second;
+    
+    // 获取数据库连接
+    Database* db = Database::getInstance();
+    
+    // 准备插入语句
+    std::string query = "INSERT INTO users (username, email, password_hash, salt, role, status, created_at, updated_at, "
+                        "solved_count, submission_count, score, easy_count, medium_count, hard_count) VALUES (";
+    query += "'" + username + "', ";
+    query += "'" + email + "', ";
+    query += "'" + password_hash + "', ";
+    query += "'" + salt + "', ";
+    query += std::to_string(role) + ", ";  // 使用管理员指定的角色
+    query += std::to_string(static_cast<int>(UserStatus::NORMAL)) + ", ";
+    
+    time_t now = time(nullptr);
+    query += std::to_string(now) + ", ";
+    query += std::to_string(now) + ", ";
+    
+    // 添加排行榜相关字段的初始值
+    query += "0, "; // solved_count
+    query += "0, "; // submission_count
+    query += "0, "; // score
+    query += "0, "; // easy_count
+    query += "0, "; // medium_count
+    query += "0)";  // hard_count
+    
+    // 执行插入
+    bool success = db->executeCommand(query);
+    
+    if (!success) {
+        error_message = "创建用户失败，数据库错误";
+        return false;
+    }
+    
+    return true;
+}
+
+// 通过管理员更新用户信息
+bool UserService::updateUserByAdmin(int user_id, const Json::Value& user_data, 
+                                  std::string& error_message) {
+    // 检查用户是否存在
+    User user = getUserInfo(user_id);
+    if (user.getId() == 0) {
+        error_message = "用户不存在";
+        return false;
+    }
+    
+    // 获取数据库连接
+    Database* db = Database::getInstance();
+    
+    // 构建更新语句
+    std::string update_query = "UPDATE users SET ";
+    
+    // 用户名更新
+    if (user_data.isMember("username") && !user_data["username"].asString().empty()) {
+        std::string new_username = user_data["username"].asString();
+        
+        // 如果用户名变更，需要检查是否已存在
+        if (new_username != user.getUsername()) {
+            if (!validateUsername(new_username)) {
+                error_message = "用户名格式不正确";
+                return false;
+            }
+            
+            if (isUserExist(new_username)) {
+                error_message = "用户名已存在";
+                return false;
+            }
+            
+            update_query += "username = '" + new_username + "', ";
+        }
+    }
+    
+    // 邮箱更新
+    if (user_data.isMember("email") && !user_data["email"].asString().empty()) {
+        std::string new_email = user_data["email"].asString();
+        
+        // 如果邮箱变更，需要检查是否已存在
+        if (new_email != user.getEmail()) {
+            if (!validateEmail(new_email)) {
+                error_message = "邮箱格式不正确";
+                return false;
+            }
+            
+            if (isEmailExist(new_email)) {
+                error_message = "邮箱已注册";
+                return false;
+            }
+            
+            update_query += "email = '" + new_email + "', ";
+        }
+    }
+    
+    // 角色更新
+    if (user_data.isMember("role")) {
+        int new_role = user_data["role"].asInt();
+        if (new_role < 0 || new_role > 2) {
+            error_message = "角色值无效";
+            return false;
+        }
+        
+        update_query += "role = " + std::to_string(new_role) + ", ";
+    }
+    
+    // 状态更新
+    if (user_data.isMember("status")) {
+        int new_status = user_data["status"].asInt();
+        if (new_status < 0 || new_status > 2) {
+            error_message = "状态值无效";
+            return false;
+        }
+        
+        update_query += "status = " + std::to_string(new_status) + ", ";
+    }
+    
+    // 头像更新
+    if (user_data.isMember("avatar") && !user_data["avatar"].asString().empty()) {
+        std::string new_avatar = user_data["avatar"].asString();
+        update_query += "avatar = '" + new_avatar + "', ";
+    }
+    
+    // 添加更新时间
+    time_t now = time(nullptr);
+    update_query += "updated_at = " + std::to_string(now);
+    
+    // 完成更新语句
+    update_query += " WHERE id = " + std::to_string(user_id);
+    
+    // 执行更新
+    bool success = db->executeCommand(update_query);
+    
+    if (!success) {
+        error_message = "更新用户信息失败，数据库错误";
+        return false;
+    }
+    
+    return true;
+}
+
+// 删除用户（软删除）
+bool UserService::deleteUser(int user_id, std::string& error_message) {
+    // 检查用户是否存在
+    User user = getUserInfo(user_id);
+    if (user.getId() == 0) {
+        error_message = "用户不存在";
+        return false;
+    }
+    
+    // 获取数据库连接
+    Database* db = Database::getInstance();
+    
+    // 软删除：更新用户状态为已删除
+    std::string query = "UPDATE users SET status = " + 
+                        std::to_string(static_cast<int>(UserStatus::DELETED)) + 
+                        ", updated_at = " + std::to_string(time(nullptr)) + 
+                        " WHERE id = " + std::to_string(user_id);
+    
+    // 执行更新
+    bool success = db->executeCommand(query);
+    
+    if (!success) {
+        error_message = "删除用户失败，数据库错误";
+        return false;
+    }
+    
+    return true;
+}
+
+// 更改用户角色
+bool UserService::changeUserRole(int user_id, UserRole role, std::string& error_message) {
+    // 检查用户是否存在
+    User user = getUserInfo(user_id);
+    if (user.getId() == 0) {
+        error_message = "用户不存在";
+        return false;
+    }
+    
+    // 验证角色值是否有效
+    int role_int = static_cast<int>(role);
+    if (role_int < 0 || role_int > 2) {
+        error_message = "角色值无效";
+        return false;
+    }
+    
+    // 获取数据库连接
+    Database* db = Database::getInstance();
+    
+    // 更新用户角色
+    std::string query = "UPDATE users SET role = " + std::to_string(role_int) + 
+                        ", updated_at = " + std::to_string(time(nullptr)) + 
+                        " WHERE id = " + std::to_string(user_id);
+    
+    // 执行更新
+    bool success = db->executeCommand(query);
+    
+    if (!success) {
+        error_message = "更改用户角色失败，数据库错误";
+        return false;
+    }
+    
+    return true;
+}
+
+// 重置用户密码
+bool UserService::resetUserPassword(int user_id, const std::string& new_password, 
+                                  std::string& error_message) {
+    // 检查用户是否存在
+    User user = getUserInfo(user_id);
+    if (user.getId() == 0) {
+        error_message = "用户不存在";
+        return false;
+    }
+    
+    // 验证新密码强度
+    if (!validatePassword(new_password)) {
+        error_message = "密码长度不能少于6位";
+        return false;
+    }
+    
+    // 生成新的密码哈希和盐 - C++11兼容写法
+    std::pair<std::string, std::string> password_data = User::generatePasswordHash(new_password);
+    std::string password_hash = password_data.first;
+    std::string salt = password_data.second;
+    
+    // 获取数据库连接
+    Database* db = Database::getInstance();
+    
+    // 更新密码
+    std::string query = "UPDATE users SET password_hash = '" + password_hash + 
+                        "', salt = '" + salt + 
+                        "', updated_at = " + std::to_string(time(nullptr)) + 
+                        " WHERE id = " + std::to_string(user_id);
+    
+    // 执行更新
+    bool success = db->executeCommand(query);
+    
+    if (!success) {
+        error_message = "重置密码失败，数据库错误";
+        return false;
+    }
+    
+    return true;
+}

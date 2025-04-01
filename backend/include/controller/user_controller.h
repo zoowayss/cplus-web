@@ -39,6 +39,29 @@ private:
     
     // 获取用户题目状态处理
     void handleGetProblemStatus(const http::Request& req, http::Response& res);
+    
+    // ===== 管理员用户管理相关处理函数 =====
+    
+    // 获取所有用户列表
+    void handleGetAllUsers(const http::Request& req, http::Response& res);
+    
+    // 创建用户（管理员）
+    void handleCreateUser(const http::Request& req, http::Response& res);
+    
+    // 更新用户信息（管理员）
+    void handleUpdateUser(const http::Request& req, http::Response& res);
+    
+    // 删除用户（管理员）
+    void handleDeleteUser(const http::Request& req, http::Response& res);
+    
+    // 更改用户角色（管理员）
+    void handleChangeUserRole(const http::Request& req, http::Response& res);
+    
+    // 更改用户状态（管理员）
+    void handleChangeUserStatus(const http::Request& req, http::Response& res);
+    
+    // 重置用户密码（管理员）
+    void handleResetUserPassword(const http::Request& req, http::Response& res);
 };
 
-#endif // USER_CONTROLLER_H 
+#endif // USER_CONTROLLER_H

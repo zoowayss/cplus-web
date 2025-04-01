@@ -51,6 +51,31 @@ public:
     // 更新用户排行榜统计信息
     static bool updateUserLeaderboardStats(int user_id, int problem_id, bool is_accepted);
     
+    // ===== 管理员用户管理相关服务方法 =====
+    
+    // 获取所有用户（支持搜索和筛选）
+    static bool getAllUsers(int offset, int limit, const std::string& search_term, 
+                           int role_filter, int status_filter, Json::Value& user_data, 
+                           int& total, std::string& error_message);
+    
+    // 通过管理员创建用户
+    static bool createUserByAdmin(const std::string& username, const std::string& password, 
+                                const std::string& email, int role, std::string& error_message);
+    
+    // 通过管理员更新用户信息
+    static bool updateUserByAdmin(int user_id, const Json::Value& user_data, 
+                                std::string& error_message);
+    
+    // 删除用户（软删除）
+    static bool deleteUser(int user_id, std::string& error_message);
+    
+    // 更改用户角色
+    static bool changeUserRole(int user_id, UserRole role, std::string& error_message);
+    
+    // 重置用户密码
+    static bool resetUserPassword(int user_id, const std::string& new_password, 
+                                std::string& error_message);
+    
 private:
     // 验证密码强度
     static bool validatePassword(const std::string& password);
