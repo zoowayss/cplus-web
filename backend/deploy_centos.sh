@@ -15,7 +15,7 @@ if [ -d "lib/cpp-httplib" ] && [ -f "lib/cpp-httplib/httplib.h" ]; then
 else
     # 如果没有lib/cpp-httplib，则尝试从网络获取
     echo "从GitHub下载httplib.h..."
-    curl -s https://raw.githubusercontent.com/yhirose/cpp-httplib/master/httplib.h -o include/httplib/httplib.h
+    curl -s https://ghfast.top/https://raw.githubusercontent.com/yhirose/cpp-httplib/master/httplib.h -o include/httplib/httplib.h
     
     if [ $? -ne 0 ]; then
         echo "警告: 无法从GitHub下载httplib.h，请手动复制到include/httplib/目录"

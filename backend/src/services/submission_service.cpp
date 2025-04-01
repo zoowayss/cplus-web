@@ -1,9 +1,9 @@
 #include "../../include/services/submission_service.h"
+#include "../../include/database/database.h"
 #include "../../include/models/submission.h"
 #include "../../include/models/submission_repository.h"
 #include "../../include/services/judge_engine.h"
 #include "../../include/services/user_service.h"
-#include "../../include/database/database.h"
 #include <iostream>
 #include <thread>
 #include <mutex>

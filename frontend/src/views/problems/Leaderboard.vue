@@ -29,11 +29,11 @@
         <el-table-column label="排名" width="80">
           <template slot-scope="scope">
             <div class="rank-cell">
-              <template v-if="scope.$index < 3">
-                <img :src="getRankIcon(scope.$index + 1)" class="rank-icon" />
+              <template v-if="getRealRank(scope.$index) <= 3">
+                <i :class="getRankIcon(getRealRank(scope.$index))" class="rank-icon"></i>
               </template>
               <template v-else>
-                {{ scope.$index + 1 }}
+                {{ getRealRank(scope.$index) }}
               </template>
             </div>
           </template>
@@ -49,9 +49,9 @@
         </el-table-column>
         <el-table-column prop="solved_count" label="已解决题目" width="120" sortable />
         <el-table-column prop="submission_count" label="提交次数" width="120" sortable />
-        <el-table-column prop="acceptance_rate" label="通过率" width="120">
+        <el-table-column label="通过率" width="120">
           <template slot-scope="scope">
-            {{ scope.row.acceptance_rate }}%
+            {{ getAcceptanceRate(scope.row) }}
           </template>
         </el-table-column>
         <el-table-column prop="score" label="积分" width="100" sortable />
@@ -59,13 +59,13 @@
           <template slot-scope="scope">
             <div class="difficulty-distribution">
               <el-tooltip content="简单题" placement="top">
-                <el-tag type="success" size="small">{{ scope.row.easy_count }}</el-tag>
+                <el-tag type="success" size="small">{{ scope.row.easy_count || 0 }}</el-tag>
               </el-tooltip>
               <el-tooltip content="中等题" placement="top">
-                <el-tag type="warning" size="small">{{ scope.row.medium_count }}</el-tag>
+                <el-tag type="warning" size="small">{{ scope.row.medium_count || 0 }}</el-tag>
               </el-tooltip>
               <el-tooltip content="困难题" placement="top">
-                <el-tag type="danger" size="small">{{ scope.row.hard_count }}</el-tag>
+                <el-tag type="danger" size="small">{{ scope.row.hard_count || 0 }}</el-tag>
               </el-tooltip>
             </div>
           </template>
@@ -73,7 +73,7 @@
       </el-table>
       
       <!-- 分页 -->
-      <div class="pagination-container">
+      <div class="pagination-container" v-if="total > 0">
         <el-pagination
           background
           @size-change="handleSizeChange"
@@ -86,8 +86,14 @@
         />
       </div>
       
+      <!-- 空数据提示 -->
+      <div v-if="!loading && leaderboardData.length === 0" class="empty-data">
+        <i class="el-icon-info"></i>
+        <p>暂无排行榜数据</p>
+      </div>
+      
       <!-- 关于排名的说明 -->
-      <div class="ranking-info">
+      <div class="ranking-info" v-if="total > 0">
         <h3>排名规则</h3>
         <p>1. 排名首先按照已解决的题目数量从高到低排序；</p>
         <p>2. 在解决题目数量相同的情况下，按照通过率从高到低排序；</p>
@@ -183,14 +189,37 @@ export default {
       return '';
     },
     
+    // 获取实际排名（考虑分页）
+    getRealRank(index) {
+      return (this.currentPage - 1) * this.pageSize + index + 1;
+    },
+    
     // 获取排名图标
     getRankIcon(rank) {
       const icons = {
-        1: 'https://assets.leetcode.com/static_assets/public/images/medals/gold.png',
-        2: 'https://assets.leetcode.com/static_assets/public/images/medals/silver.png',
-        3: 'https://assets.leetcode.com/static_assets/public/images/medals/bronze.png'
+        1: 'el-icon-trophy gold-medal',
+        2: 'el-icon-medal silver-medal',
+        3: 'el-icon-medal-1 bronze-medal'
       };
       return icons[rank] || '';
+    },
+    
+    // 计算通过率
+    getAcceptanceRate(row) {
+      if (!row) return '0%';
+      
+      // 如果后端已经返回了计算好的通过率
+      if (row.acceptance_rate !== undefined) {
+        return `${row.acceptance_rate}%`;
+      }
+      
+      // 否则自己计算
+      if (!row.submission_count || row.submission_count === 0) {
+        return '0%';
+      }
+      
+      const rate = (row.solved_count / row.submission_count * 100).toFixed(2);
+      return `${rate}%`;
     }
   }
 };
@@ -219,8 +248,25 @@ export default {
       font-weight: bold;
       
       .rank-icon {
-        width: 20px;
-        height: 20px;
+        font-size: 24px;
+        transition: transform 0.2s ease;
+        
+        &:hover {
+          transform: scale(1.2);
+        }
+      }
+      
+      .gold-medal {
+        color: #FFD700;
+        font-size: 26px;
+      }
+      
+      .silver-medal {
+        color: #C0C0C0;
+      }
+      
+      .bronze-medal {
+        color: #CD7F32;
       }
     }
     
@@ -250,6 +296,21 @@ export default {
     .pagination-container {
       margin-top: 20px;
       text-align: right;
+    }
+    
+    .empty-data {
+      padding: 40px 0;
+      text-align: center;
+      color: #909399;
+      
+      i {
+        font-size: 48px;
+        margin-bottom: 10px;
+      }
+      
+      p {
+        font-size: 16px;
+      }
     }
     
     .ranking-info {
