@@ -6,6 +6,7 @@
 #include <ctime>
 #include <map>
 #include <mysql/mysql.h>
+#include <json/json.h>
 
 // 验证密码强度
 bool UserService::validatePassword(const std::string& password) {
@@ -104,8 +105,9 @@ bool UserService::registerUser(const std::string& username, const std::string& e
     // 获取数据库连接
     Database* db = Database::getInstance();
     
-    // 准备插入语句
-    std::string query = "INSERT INTO users (username, email, password_hash, salt, role, status, created_at, updated_at) VALUES (";
+    // 准备插入语句，添加排行榜相关字段
+    std::string query = "INSERT INTO users (username, email, password_hash, salt, role, status, created_at, updated_at, "
+                        "solved_count, submission_count, score, easy_count, medium_count, hard_count) VALUES (";
     query += "'" + username + "', ";
     query += "'" + email + "', ";
     query += "'" + password_hash + "', ";
@@ -115,7 +117,15 @@ bool UserService::registerUser(const std::string& username, const std::string& e
     
     time_t now = time(nullptr);
     query += std::to_string(now) + ", ";
-    query += std::to_string(now) + ")";
+    query += std::to_string(now) + ", ";
+    
+    // 添加排行榜相关字段的初始值
+    query += "0, "; // solved_count
+    query += "0, "; // submission_count
+    query += "0, "; // score
+    query += "0, "; // easy_count
+    query += "0, "; // medium_count
+    query += "0)";  // hard_count
     
     // 执行插入
     bool success = db->executeCommand(query);
@@ -417,4 +427,215 @@ bool UserService::changeUserStatus(int user_id, UserStatus status, std::string& 
     }
     
     return true;
+}
+
+// 获取用户排行榜
+bool UserService::getLeaderboard(int offset, int limit, const std::string& time_range, 
+                               int current_user_id, Json::Value& leaderboard_data, 
+                               int& total, std::string& error_message) {
+    // 获取数据库连接
+    Database* db = Database::getInstance();
+    
+    // 先查询数据库确认表结构
+    std::string table_check_query = "SHOW TABLES LIKE 'submissions'";
+    MYSQL_RES* table_check_result = db->executeQuery(table_check_query);
+    bool has_submissions_table = false;
+    
+    if (table_check_result && mysql_num_rows(table_check_result) > 0) {
+        has_submissions_table = true;
+        mysql_free_result(table_check_result);
+    } else if (table_check_result) {
+        mysql_free_result(table_check_result);
+    }
+    
+    // 根据数据库结构选择不同的查询
+    std::string base_query;
+    
+    if (has_submissions_table) {
+        // 有submissions表，使用关联查询
+        base_query = "SELECT u.id, u.username, IFNULL(u.avatar, '') as avatar, "
+                      "COUNT(DISTINCT CASE WHEN s.result = 2 THEN s.problem_id END) as solved_count, "
+                      "COUNT(DISTINCT s.id) as submission_count, "
+                      "0 as score, "
+                      "0 as easy_count, "
+                      "0 as medium_count, "
+                      "0 as hard_count, "
+                      "CASE WHEN COUNT(DISTINCT s.id) > 0 THEN "
+                      "ROUND(COUNT(DISTINCT CASE WHEN s.result = 2 THEN s.problem_id END) * 100.0 / COUNT(DISTINCT s.id), 2) "
+                      "ELSE 0 END as acceptance_rate "
+                      "FROM users u "
+                      "LEFT JOIN submissions s ON u.id = s.user_id "
+                      "WHERE u.role < 2 "; // 排除管理员
+    } else {
+        // 没有submissions表，只查询users表
+        base_query = "SELECT u.id, u.username, IFNULL(u.avatar, '') as avatar, "
+                      "0 as solved_count, "
+                      "0 as submission_count, "
+                      "0 as score, "
+                      "0 as easy_count, "
+                      "0 as medium_count, "
+                      "0 as hard_count, "
+                      "0 as acceptance_rate "
+                      "FROM users u "
+                      "WHERE u.role < 2 "; // 排除管理员
+    }
+    
+    // 根据时间范围添加条件
+    std::string time_condition = "";
+    if (time_range == "day") {
+        time_condition = " AND DATE(FROM_UNIXTIME(u.last_login)) = CURDATE() ";
+    } else if (time_range == "week") {
+        time_condition = " AND YEARWEEK(FROM_UNIXTIME(u.last_login)) = YEARWEEK(NOW()) ";
+    } else if (time_range == "month") {
+        time_condition = " AND MONTH(FROM_UNIXTIME(u.last_login)) = MONTH(NOW()) AND YEAR(FROM_UNIXTIME(u.last_login)) = YEAR(NOW()) ";
+    }
+    
+    // 添加分组
+    std::string group_by = has_submissions_table ? "GROUP BY u.id " : "";
+    
+    // 添加排序规则
+    std::string order_query = "ORDER BY ";
+    order_query += has_submissions_table ? "solved_count DESC, acceptance_rate DESC, submission_count ASC " : "u.id ASC ";
+    
+    // 添加分页
+    std::string limit_query = "LIMIT " + std::to_string(limit) + " OFFSET " + std::to_string(offset);
+    
+    // 计算总数
+    std::string count_query = "SELECT COUNT(*) FROM users u WHERE u.role < 2 " + time_condition;
+    MYSQL_RES* count_result = db->executeQuery(count_query);
+    
+    if (!count_result) {
+        error_message = "获取排行榜数据失败，数据库错误";
+        return false;
+    }
+    
+    MYSQL_ROW count_row = mysql_fetch_row(count_result);
+    if (count_row && count_row[0]) {
+        total = std::stoi(count_row[0]);
+    } else {
+        total = 0;
+    }
+    mysql_free_result(count_result);
+    
+    // 如果没有数据，直接返回空数组
+    if (total == 0) {
+        leaderboard_data = Json::Value(Json::arrayValue);
+        return true;
+    }
+    
+    // 执行查询获取排行榜数据
+    std::string query = base_query + time_condition + group_by + order_query + limit_query;
+    
+    // 打印查询语句用于调试
+    std::cout << "执行查询: " << query << std::endl;
+    
+    MYSQL_RES* result = db->executeQuery(query);
+    
+    if (!result) {
+        error_message = "获取排行榜数据失败，数据库错误";
+        std::cout << "查询执行失败" << std::endl;
+        return false;
+    }
+    
+    // 处理查询结果
+    MYSQL_ROW row;
+    Json::Value users(Json::arrayValue);
+    
+    while ((row = mysql_fetch_row(result))) {
+        Json::Value user;
+        
+        int user_id = row[0] ? std::stoi(row[0]) : 0;
+        std::string username = row[1] ? row[1] : "";
+        std::string avatar = row[2] ? row[2] : "";
+        int solved_count = row[3] ? std::stoi(row[3]) : 0;
+        int submission_count = row[4] ? std::stoi(row[4]) : 0;
+        int score = row[5] ? std::stoi(row[5]) : 0;
+        int easy_count = row[6] ? std::stoi(row[6]) : 0;
+        int medium_count = row[7] ? std::stoi(row[7]) : 0;
+        int hard_count = row[8] ? std::stoi(row[8]) : 0;
+        double acceptance_rate = row[9] ? std::stod(row[9]) : 0.0;
+        
+        user["user_id"] = user_id;
+        user["username"] = username;
+        user["avatar"] = avatar;
+        user["solved_count"] = solved_count;
+        user["submission_count"] = submission_count;
+        user["score"] = score;
+        user["easy_count"] = easy_count;
+        user["medium_count"] = medium_count;
+        user["hard_count"] = hard_count;
+        user["acceptance_rate"] = acceptance_rate;
+        user["is_current_user"] = (user_id == current_user_id);
+        
+        users.append(user);
+    }
+    
+    mysql_free_result(result);
+    leaderboard_data = users;
+    
+    return true;
+}
+
+// 更新用户排行榜统计信息
+bool UserService::updateUserLeaderboardStats(int user_id, int problem_id, bool is_accepted) {
+    // 获取数据库连接
+    Database* db = Database::getInstance();
+    
+    // 1. 获取用户当前统计信息
+    User user = getUserInfo(user_id);
+    if (user.getId() == 0) {
+        return false;
+    }
+    
+    // 2. 获取题目信息，确定难度
+    std::string problem_query = "SELECT difficulty FROM problems WHERE id = " + std::to_string(problem_id);
+    MYSQL_RES* problem_result = db->executeQuery(problem_query);
+    
+    if (!problem_result || mysql_num_rows(problem_result) == 0) {
+        if (problem_result) mysql_free_result(problem_result);
+        return false;
+    }
+    
+    MYSQL_ROW problem_row = mysql_fetch_row(problem_result);
+    std::string difficulty = problem_row[0] ? problem_row[0] : "中等";
+    mysql_free_result(problem_result);
+    
+    // 3. 检查用户是否已经通过该题目，避免重复计算
+    std::string check_query = "SELECT COUNT(*) FROM submissions WHERE user_id = " + std::to_string(user_id) + 
+                              " AND problem_id = " + std::to_string(problem_id) + 
+                              " AND result = 2"; // 2 表示已通过
+    
+    MYSQL_RES* check_result = db->executeQuery(check_query);
+    
+    if (!check_result) {
+        return false;
+    }
+    
+    MYSQL_ROW check_row = mysql_fetch_row(check_result);
+    bool already_solved = check_row[0] && std::stoi(check_row[0]) > 0;
+    mysql_free_result(check_result);
+    
+    // 4. 更新数据
+    std::string update_query = "UPDATE users SET";
+    
+    // 总是增加提交次数
+    update_query += " submission_count = submission_count + 1";
+    
+    // 如果是通过且之前没有通过过，则更新解题数量和积分
+    if (is_accepted && !already_solved) {
+        update_query += ", solved_count = solved_count + 1";
+        
+        // 根据难度增加相应难度的题目计数
+        if (difficulty == "简单") {
+            update_query += ", easy_count = easy_count + 1, score = score + 10";
+        } else if (difficulty == "中等") {
+            update_query += ", medium_count = medium_count + 1, score = score + 20";
+        } else if (difficulty == "困难") {
+            update_query += ", hard_count = hard_count + 1, score = score + 30";
+        }
+    }
+    
+    update_query += " WHERE id = " + std::to_string(user_id);
+    
+    return db->executeCommand(update_query);
 } 

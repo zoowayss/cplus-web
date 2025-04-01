@@ -114,4 +114,12 @@ export function getUserProblemSubmissions(problemId, params) {
     method: 'get',
     params
   })
+}
+
+// 获取用户题目状态
+export function getUserProblemStatus() {
+  return request({
+    url: '/api/user/problem-status',
+    method: 'get'
+  })
 } 

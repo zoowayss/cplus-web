@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 #include "../models/submission.h"
+#include <json/json.h>
 
 class SubmissionService {
 public:
@@ -46,6 +47,9 @@ public:
     
     // 计算用户的通过率
     static float getUserAcceptanceRate(int user_id);
+    
+    // 获取用户题目状态
+    static bool getUserProblemStatus(int user_id, Json::Value& status_data, std::string& error_message);
     
     // 更新提交状态
     static bool updateSubmissionStatus(int submission_id, JudgeResult result);

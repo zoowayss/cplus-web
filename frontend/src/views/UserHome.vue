@@ -150,7 +150,7 @@ import { getUserInfo, logout } from '@/api/user'
 const ProblemList = () => import('@/views/problems/ProblemList.vue')
 const ProblemDetail = () => import('@/views/problems/ProblemDetail.vue')
 const SubmissionList = () => import('@/views/problems/SubmissionList.vue')
-const Leaderboard = () => import('@/views/leaderboard/Leaderboard.vue')
+const Leaderboard = () => import('@/views/problems/Leaderboard.vue')
 
 export default {
   name: 'UserHome',

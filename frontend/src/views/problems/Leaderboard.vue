@@ -98,6 +98,8 @@
 </template>
 
 <script>
+import { getLeaderboard } from '@/api/leaderboard'
+
 export default {
   name: 'Leaderboard',
   data() {
@@ -107,120 +109,7 @@ export default {
       currentPage: 1,
       pageSize: 10,
       total: 0,
-      timeRange: 'all',
-      // 模拟数据
-      mockData: [
-        {
-          username: '张三',
-          is_current_user: true,
-          solved_count: 98,
-          submission_count: 120,
-          acceptance_rate: 82,
-          score: 980,
-          easy_count: 40,
-          medium_count: 38,
-          hard_count: 20
-        },
-        {
-          username: '李四',
-          is_current_user: false,
-          solved_count: 105,
-          submission_count: 140,
-          acceptance_rate: 75,
-          score: 1050,
-          easy_count: 42,
-          medium_count: 40,
-          hard_count: 23
-        },
-        {
-          username: '王五',
-          is_current_user: false,
-          solved_count: 120,
-          submission_count: 150,
-          acceptance_rate: 80,
-          score: 1200,
-          easy_count: 45,
-          medium_count: 45,
-          hard_count: 30
-        },
-        {
-          username: '赵六',
-          is_current_user: false,
-          solved_count: 90,
-          submission_count: 130,
-          acceptance_rate: 69,
-          score: 900,
-          easy_count: 50,
-          medium_count: 30,
-          hard_count: 10
-        },
-        {
-          username: '钱七',
-          is_current_user: false,
-          solved_count: 85,
-          submission_count: 100,
-          acceptance_rate: 85,
-          score: 850,
-          easy_count: 45,
-          medium_count: 35,
-          hard_count: 5
-        },
-        {
-          username: '孙八',
-          is_current_user: false,
-          solved_count: 78,
-          submission_count: 95,
-          acceptance_rate: 82,
-          score: 780,
-          easy_count: 40,
-          medium_count: 30,
-          hard_count: 8
-        },
-        {
-          username: '周九',
-          is_current_user: false,
-          solved_count: 70,
-          submission_count: 90,
-          acceptance_rate: 78,
-          score: 700,
-          easy_count: 38,
-          medium_count: 25,
-          hard_count: 7
-        },
-        {
-          username: '吴十',
-          is_current_user: false,
-          solved_count: 65,
-          submission_count: 80,
-          acceptance_rate: 81,
-          score: 650,
-          easy_count: 35,
-          medium_count: 20,
-          hard_count: 10
-        },
-        {
-          username: '郑十一',
-          is_current_user: false,
-          solved_count: 60,
-          submission_count: 75,
-          acceptance_rate: 80,
-          score: 600,
-          easy_count: 30,
-          medium_count: 20,
-          hard_count: 10
-        },
-        {
-          username: '王十二',
-          is_current_user: false,
-          solved_count: 55,
-          submission_count: 70,
-          acceptance_rate: 79,
-          score: 550,
-          easy_count: 30,
-          medium_count: 15,
-          hard_count: 10
-        }
-      ]
+      timeRange: 'all'
     };
   },
   created() {
@@ -231,21 +120,6 @@ export default {
     fetchLeaderboard() {
       this.loading = true;
       
-      // 模拟API调用
-      setTimeout(() => {
-        // 对模拟数据按照解决题目数量进行排序
-        this.leaderboardData = [...this.mockData].sort((a, b) => {
-          if (b.solved_count !== a.solved_count) return b.solved_count - a.solved_count;
-          if (b.acceptance_rate !== a.acceptance_rate) return b.acceptance_rate - a.acceptance_rate;
-          return a.submission_count - b.submission_count;
-        });
-        
-        this.total = this.leaderboardData.length;
-        this.loading = false;
-      }, 500);
-      
-      // 实际API调用方式
-      /*
       const params = {
         offset: (this.currentPage - 1) * this.pageSize,
         limit: this.pageSize,
@@ -254,9 +128,22 @@ export default {
       
       getLeaderboard(params)
         .then(response => {
+          console.log('获取排行榜数据:', response);
           if (response.status === 'ok') {
-            this.leaderboardData = response.leaderboard || [];
-            this.total = response.total || 0;
+            // 检查数据结构
+            if (response.data && response.data.leaderboard) {
+              this.leaderboardData = response.data.leaderboard || [];
+              this.total = response.data.total || 0;
+            } else if (response.leaderboard) {
+              // 兼容不同的数据结构
+              this.leaderboardData = response.leaderboard || [];
+              this.total = response.total || 0;
+            } else {
+              // 无数据时展示空数组
+              this.leaderboardData = [];
+              this.total = 0;
+              console.warn('排行榜数据格式不正确', response);
+            }
           } else {
             this.$message.error(response.message || '获取排行榜失败');
           }
@@ -268,7 +155,6 @@ export default {
         .finally(() => {
           this.loading = false;
         });
-      */
     },
     
     // 处理时间范围变化

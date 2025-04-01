@@ -1,5 +1,7 @@
 #include "../../include/controller/user_controller.h"
 #include <iostream>
+#include <sstream>
+#include <string>
 
 // 注册所有用户相关路由
 void UserController::registerRoutes(http::HttpServer* server) {
@@ -32,6 +34,16 @@ void UserController::registerRoutes(http::HttpServer* server) {
     server->post("/api/verify_token", [this](const http::Request& req, http::Response& res) {
         this->handleVerifyToken(req, res);
     });
+    
+    // 获取用户排行榜路由
+    server->get("/api/leaderboard", middleware::AuthMiddleware::protect([this](const http::Request& req, http::Response& res) {
+        this->handleGetLeaderboard(req, res);
+    }));
+    
+    // 获取用户题目状态路由
+    server->get("/api/user/problem-status", middleware::AuthMiddleware::protect([this](const http::Request& req, http::Response& res) {
+        this->handleGetProblemStatus(req, res);
+    }));
 }
 
 // 用户登录处理
@@ -229,4 +241,93 @@ void UserController::handleVerifyToken(const http::Request& req, http::Response&
     data["username"] = user.getUsername();
     
     sendSuccessResponse(res, "令牌有效", data);
+}
+
+// 获取用户排行榜处理
+void UserController::handleGetLeaderboard(const http::Request& req, http::Response& res) {
+    // 获取请求参数
+    int offset = 0;
+    int limit = 10;
+    std::string time_range = "all";
+
+    // 解析URL查询参数
+    std::string path = req.path;
+    size_t pos = path.find('?');
+    if (pos != std::string::npos) {
+        std::string query = path.substr(pos + 1);
+        std::istringstream ss(query);
+        std::string param;
+        
+        while (std::getline(ss, param, '&')) {
+            size_t equal_pos = param.find('=');
+            if (equal_pos != std::string::npos) {
+                std::string key = param.substr(0, equal_pos);
+                std::string value = param.substr(equal_pos + 1);
+                
+                try {
+                    if (key == "offset" && !value.empty()) {
+                        offset = std::stoi(value);
+                    } else if (key == "limit" && !value.empty()) {
+                        limit = std::stoi(value);
+                    } else if (key == "time_range" && !value.empty()) {
+                        time_range = value;
+                    }
+                } catch (...) {
+                    // 忽略转换错误，使用默认值
+                }
+            }
+        }
+    }
+    
+    // 从请求头获取令牌
+    std::string auth_header = req.get_header("Authorization");
+    std::string token = auth_header.substr(7);
+    
+    // 获取当前用户ID
+    int current_user_id = JWT::getUserIdFromToken(token);
+    
+    // 获取排行榜数据
+    Json::Value leaderboard_data;
+    int total = 0;
+    std::string error_message;
+    
+    bool success = UserService::getLeaderboard(offset, limit, time_range, current_user_id, leaderboard_data, total, error_message);
+    
+    if (success) {
+        Json::Value data;
+        data["leaderboard"] = leaderboard_data;
+        data["total"] = total;
+        
+        sendSuccessResponse(res, "获取排行榜成功", data);
+    } else {
+        sendErrorResponse(res, error_message, 400);
+    }
+}
+
+// 获取用户题目状态处理
+void UserController::handleGetProblemStatus(const http::Request& req, http::Response& res) {
+    // 从请求头获取令牌
+    std::string auth_header = req.get_header("Authorization");
+    std::string token = auth_header.substr(7);
+    
+    // 获取当前用户ID
+    int user_id = JWT::getUserIdFromToken(token);
+    
+    if (user_id <= 0) {
+        sendErrorResponse(res, "无效的用户ID", 401);
+        return;
+    }
+    
+    // 获取用户题目状态
+    Json::Value status_data;
+    std::string error_message;
+    
+    // 假设我们有一个从SubmissionService中获取用户题目状态的方法
+    bool success = SubmissionService::getUserProblemStatus(user_id, status_data, error_message);
+    
+    if (success) {
+        sendSuccessResponse(res, "获取题目状态成功", status_data);
+    } else {
+        sendErrorResponse(res, error_message, 400);
+    }
 } 

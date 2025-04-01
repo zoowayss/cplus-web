@@ -82,7 +82,7 @@
 </template>
 
 <script>
-import { getProblems } from '@/api/problem';
+import { getProblems, getUserProblemStatus } from '@/api/problem';
 
 export default {
   name: 'ProblemList',
@@ -95,18 +95,30 @@ export default {
       pageSize: 10,
       searchQuery: '',
       difficultyFilter: '',
-      // 模拟的解题状态数据，实际应从后端获取
-      mockUserStatus: {
-        1: 'accepted',
-        2: 'attempted',
-        3: 'accepted'
-      },
+      // 实际的用户题目状态
+      userProblemStatus: {}
     };
   },
   created() {
+    this.getUserStatus();
     this.fetchProblems();
   },
   methods: {
+    // 获取用户题目状态
+    getUserStatus() {
+      getUserProblemStatus()
+        .then(response => {
+          if (response.status === 'ok' && response.data) {
+            this.userProblemStatus = response.data;
+          } else {
+            console.warn('获取用户题目状态失败', response);
+          }
+        })
+        .catch(error => {
+          console.error('获取用户题目状态失败:', error);
+        });
+    },
+    
     // 获取题目列表
     fetchProblems() {
       this.loading = true;
@@ -122,12 +134,19 @@ export default {
       getProblems(params)
         .then(response => {
           if (response.status === 'ok') {
-            // 添加解题率和用户解题状态（实际项目中这些数据应该从后端获取）
+            // 添加用户解题状态
             this.problems = (response.problems || []).map(problem => {
+              let status = null;
+              
+              // 使用后端返回的状态
+              if (this.userProblemStatus[problem.id]) {
+                status = this.userProblemStatus[problem.id];
+              }
+              
               return {
                 ...problem,
-                acceptance_rate: this.getRandomAcceptanceRate(),
-                user_status: this.mockUserStatus[problem.id] || null
+                acceptance_rate: problem.acceptance_rate || '0%',
+                user_status: status
               };
             });
             this.total = response.total || 0;
@@ -142,12 +161,6 @@ export default {
         .finally(() => {
           this.loading = false;
         });
-    },
-    
-    // 生成随机解题率（模拟数据）
-    getRandomAcceptanceRate() {
-      const rate = Math.floor(Math.random() * 100);
-      return rate + '%';
     },
     
     // 每页数量变化

@@ -84,7 +84,13 @@ int main(int argc, char** argv) {
         "status INT DEFAULT 0,"
         "created_at BIGINT NOT NULL,"
         "updated_at BIGINT NOT NULL,"
-        "last_login BIGINT DEFAULT 0"
+        "last_login BIGINT DEFAULT 0,"
+        "solved_count INT DEFAULT 0,"
+        "submission_count INT DEFAULT 0,"
+        "score INT DEFAULT 0,"
+        "easy_count INT DEFAULT 0,"
+        "medium_count INT DEFAULT 0,"
+        "hard_count INT DEFAULT 0"
         ")";
     
     if (!db->executeCommand(create_users_table)) {
@@ -238,7 +244,7 @@ int main(int argc, char** argv) {
     }
     
     // 添加示例管理员帐户
-    if (!db->executeCommand("INSERT INTO `cplus`.`users` (`id`, `username`, `email`, `password_hash`, `salt`, `avatar`, `role`, `status`, `created_at`, `updated_at`, `last_login`) VALUES (2, 'admin', 'admin@c.cc', '75d369ed5cb43aa6cbb62c405dd582a0e8b43aa985c4cbc230515b1247365446', '81a275083037c1df028f804739fb445e', NULL, 2, 0, 1743239731, 1743392154, 1743392154)")) {
+    if (!db->executeCommand("INSERT IGNORE INTO `cplus`.`users` (`id`, `username`, `email`, `password_hash`, `salt`, `avatar`, `role`, `status`, `created_at`, `updated_at`, `last_login`, `solved_count`, `submission_count`, `score`, `easy_count`, `medium_count`, `hard_count`) VALUES (2, 'admin', 'admin@c.cc', '75d369ed5cb43aa6cbb62c405dd582a0e8b43aa985c4cbc230515b1247365446', '81a275083037c1df028f804739fb445e', NULL, 2, 0, 1743239731, 1743392154, 1743392154, 0, 0, 0, 0, 0, 0)")) {
         std::cerr << "无法插入示例管理员帐户" << std::endl;
     }
     

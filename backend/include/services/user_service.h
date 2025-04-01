@@ -5,6 +5,7 @@
 #include <vector>
 #include <map>
 #include "../models/user.h"
+#include <json/json.h>
 
 class UserService {
 public:
@@ -41,6 +42,14 @@ public:
     
     // 更改用户状态（封禁/解禁）
     static bool changeUserStatus(int user_id, UserStatus status, std::string& error_message);
+    
+    // 获取用户排行榜
+    static bool getLeaderboard(int offset, int limit, const std::string& time_range, 
+                              int current_user_id, Json::Value& leaderboard_data, 
+                              int& total, std::string& error_message);
+    
+    // 更新用户排行榜统计信息
+    static bool updateUserLeaderboardStats(int user_id, int problem_id, bool is_accepted);
     
 private:
     // 验证密码强度

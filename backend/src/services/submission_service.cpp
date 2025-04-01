@@ -2,12 +2,16 @@
 #include "../../include/models/submission.h"
 #include "../../include/models/submission_repository.h"
 #include "../../include/services/judge_engine.h"
+#include "../../include/services/user_service.h"
+#include "../../include/database/database.h"
 #include <iostream>
 #include <thread>
 #include <mutex>
 #include <queue>
 #include <condition_variable>
 #include <unistd.h>
+#include <mysql/mysql.h>
+#include <json/json.h>
 
 // 线程管理接口实现
 void SubmissionService::ensureJudgeThreadRunning() {
@@ -144,7 +148,18 @@ bool SubmissionService::judgeSubmission(int submission_id, JudgeResult result, i
     submission.setErrorMessage(error_message);
     
     // 保存到数据库
-    return SubmissionRepository::updateSubmission(submission);
+    bool success = SubmissionRepository::updateSubmission(submission);
+    
+    // 如果更新成功，则更新用户的排行榜统计信息
+    if (success) {
+        // 检查是否通过评测
+        bool is_accepted = (result == JudgeResult::ACCEPTED);
+        
+        // 更新用户的排行榜统计信息
+        UserService::updateUserLeaderboardStats(submission.getUserId(), submission.getProblemId(), is_accepted);
+    }
+    
+    return success;
 }
 
 // 添加测试点结果
@@ -269,4 +284,53 @@ bool SubmissionService::updateSubmissionStatus(int submission_id, JudgeResult re
     // 更新状态
     submission.setResult(result);
     return SubmissionRepository::updateSubmission(submission);
+}
+
+// 获取用户题目状态
+bool SubmissionService::getUserProblemStatus(int user_id, Json::Value& status_data, std::string& error_message) {
+    try {
+        // 获取数据库连接
+        Database* db = Database::getInstance();
+        
+        // 构建查询语句：找出用户提交过的所有题目及其最佳状态
+        std::string query = "SELECT s.problem_id, "
+                           // 如果存在ACCEPTED状态，则为'accepted'，否则为'attempted'
+                           "CASE WHEN MAX(CASE WHEN s.result = 2 THEN 1 ELSE 0 END) > 0 THEN 'accepted' "
+                           "ELSE 'attempted' END as status "
+                           "FROM submissions s "
+                           "WHERE s.user_id = " + std::to_string(user_id) + " "
+                           "GROUP BY s.problem_id";
+        
+        MYSQL_RES* result = db->executeQuery(query);
+        
+        if (!result) {
+            error_message = "获取用户题目状态失败，数据库错误";
+            return false;
+        }
+        
+        // 处理查询结果
+        MYSQL_ROW row;
+        Json::Value statusMap(Json::objectValue);
+        
+        while ((row = mysql_fetch_row(result))) {
+            int problem_id = row[0] ? std::stoi(row[0]) : 0;
+            std::string status = row[1] ? row[1] : "attempted";
+            
+            // 添加到状态映射
+            if (problem_id > 0) {
+                statusMap[std::to_string(problem_id)] = status;
+            }
+        }
+        
+        mysql_free_result(result);
+        status_data = statusMap;
+        
+        return true;
+    } catch (const std::exception& e) {
+        error_message = std::string("获取用户题目状态异常: ") + e.what();
+        return false;
+    } catch (...) {
+        error_message = "获取用户题目状态发生未知异常";
+        return false;
+    }
 } 

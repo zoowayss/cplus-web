@@ -3,6 +3,7 @@
 
 #include "base_controller.h"
 #include "../services/user_service.h"
+#include "../services/submission_service.h"
 #include "../http/http_server.h"
 #include "../middleware/auth_middleware.h"
 
@@ -32,6 +33,12 @@ private:
     
     // 验证令牌处理
     void handleVerifyToken(const http::Request& req, http::Response& res);
+    
+    // 获取用户排行榜处理
+    void handleGetLeaderboard(const http::Request& req, http::Response& res);
+    
+    // 获取用户题目状态处理
+    void handleGetProblemStatus(const http::Request& req, http::Response& res);
 };
 
 #endif // USER_CONTROLLER_H 

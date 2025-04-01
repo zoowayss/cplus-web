@@ -5,7 +5,8 @@ import router from '@/router'
 
 // 创建axios实例
 const service = axios.create({
-  baseURL: 'http://localhost:8080', // 直接连接到后端服务器
+  // baseURL: 'http://47.109.39.201:8080', // 直接连接到后端服务器
+  baseURL: 'http://127.0.0.1:8080', // 直接连接到后端服务器
   timeout: 5000 // 请求超时
 })
 
