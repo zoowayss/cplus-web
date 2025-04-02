@@ -277,7 +277,7 @@ export default {
           this.submitting = true;
           const response = await createDiscussion(this.discussionForm);
           
-          if (response.status === 'success') {
+          if (response.status === 'ok') {
             this.$message.success('发起讨论成功');
             this.createDialogVisible = false;
             // 刷新讨论列表
@@ -413,7 +413,7 @@ export default {
         
         const response = await deleteDiscussionReply(replyId);
         
-        if (response.status === 'success') {
+        if (response.status === 'ok') {
           this.$message.success('删除回复成功');
           // 刷新回复列表
           this.fetchReplies(this.currentDiscussion.id);

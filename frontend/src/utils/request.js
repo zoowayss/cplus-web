@@ -51,7 +51,7 @@ service.interceptors.response.use(
       return res
     } else {
       // 显示错误消息
-      Message.error(res.message || '请求失败')
+      // Message.error(res.message || '请求失败')
       
       // 401: 未登录或token过期
       if (res.code === 401) {
@@ -63,8 +63,6 @@ service.interceptors.response.use(
     }
   },
   error => {
-    console.error('响应错误: ', error)
-    
     // 记录DELETE请求的错误详情
     if (error.config && error.config.method === 'delete') {
       console.error('DELETE请求失败详情:', {
