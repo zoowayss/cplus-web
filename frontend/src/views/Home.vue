@@ -49,6 +49,10 @@
                 <span>添加题目</span>
               </el-menu-item>
             </el-submenu>
+            <el-menu-item index="competition-management">
+              <i class="el-icon-trophy"></i>
+              <span slot="title">比赛管理</span>
+            </el-menu-item>
             <el-menu-item index="user-management">
               <i class="el-icon-s-custom"></i>
               <span slot="title">用户管理</span>
@@ -173,6 +177,7 @@ import { getUserInfo, logout } from '@/api/user'
 const AdminProblemList = () => import('@/views/admin/problems/ProblemList.vue')
 const ProblemEdit = () => import('@/views/admin/problems/ProblemEdit.vue')
 const TestCaseManager = () => import('@/views/admin/problems/TestCaseManager.vue')
+const CompetitionManagement = () => import('@/views/admin/competitions/CompetitionManagement.vue')
 
 // 用户管理组件可能需要创建
 const UserManagement = {
@@ -200,6 +205,7 @@ export default {
     AdminProblemList,
     ProblemEdit,
     TestCaseManager,
+    CompetitionManagement,
     UserManagement,
     SubmissionManagement,
     SystemSettings,
@@ -435,6 +441,19 @@ export default {
         case 'problem-create':
           this.$router.push('/admin/problems/create');
           break;
+        case 'competition-management':
+          this.currentComponent = 'CompetitionManagement';
+          this.componentParams = {};
+          this.activeMenu = 'competition-management';
+          this.$router.push({
+            path: '/admin',
+            query: { component: 'competition-management' }
+          }).catch(err => {
+            if (err.name !== 'NavigationDuplicated') {
+              throw err;
+            }
+          });
+          break;
         case 'user-management':
           this.$router.push('/admin/users');
           break;
@@ -546,6 +565,11 @@ export default {
           break
         case 'problems':
           this.handleSelect('problem-list')
+          break
+        case 'competition-management':
+          this.currentComponent = 'CompetitionManagement'
+          this.componentParams = {}
+          this.activeMenu = 'competition-management'
           break
         case 'submissions':
           this.handleSelect('submission-management')

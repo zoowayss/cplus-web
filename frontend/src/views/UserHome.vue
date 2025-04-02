@@ -41,9 +41,13 @@
             <i class="el-icon-s-order"></i>
             <span slot="title">题目列表</span>
           </el-menu-item>
+          <el-menu-item index="competitions">
+            <i class="el-icon-trophy"></i>
+            <span slot="title">比赛</span>
+          </el-menu-item>
           <el-menu-item index="submissions">
-            <i class="el-icon-s-claim"></i>
-            <span slot="title">我的提交</span>
+            <i class="el-icon-s-data"></i>
+            <span slot="title">提交记录</span>
           </el-menu-item>
           <el-menu-item index="leaderboard">
             <i class="el-icon-trophy"></i>
@@ -145,6 +149,8 @@
 
 <script>
 import { getUserInfo, logout } from '@/api/user'
+// 导入用户比赛组件
+const UserCompetitions = () => import('@/views/competitions/UserCompetitions.vue')
 
 // 懒加载组件
 const ProblemList = () => import('@/views/problems/ProblemList.vue')
@@ -152,18 +158,27 @@ const ProblemDetail = () => import('@/views/problems/ProblemDetail.vue')
 const SubmissionList = () => import('@/views/problems/SubmissionList.vue')
 const Leaderboard = () => import('@/views/problems/Leaderboard.vue')
 
+// 临时创建账户设置组件
+const AccountSettings = {
+  template: '<div><h2>账户设置</h2><p>账户设置功能正在开发中...</p></div>'
+}
+
 export default {
   name: 'UserHome',
   components: {
+    UserCompetitions,
     ProblemList,
     ProblemDetail,
     SubmissionList,
-    Leaderboard
+    Leaderboard,
+    AccountSettings
   },
   data() {
     return {
       username: this.$store.state.user ? this.$store.state.user.username : '用户',
-      isCollapse: window.innerWidth <= 768,
+      email: '',
+      role: 1, // 默认普通用户角色
+      isCollapse: window.innerWidth < 768,
       solvedCount: 25,
       submissionCount: 87,
       passRate: 68,
@@ -187,16 +202,32 @@ export default {
       ],
       activeMenu: 'dashboard',
       currentComponent: null,
-      componentParams: {}
+      componentParams: {},
+      // 添加比赛相关数据
+      competitions: [],
     }
   },
   created() {
-    window.addEventListener('resize', this.handleResize)
+    // 登录状态检查
+    if (!this.$store.getters.isAuthenticated) {
+      this.$message.warning('请先登录');
+      this.$router.push('/login');
+      return;
+    }
     
-    // 检查URL参数是否需要加载特定组件
-    const queryParams = this.$route.query
+    // 加载用户信息
+    this.fetchUserInfo();
+    
+    // 加载比赛数据
+    this.loadCompetitions();
+    
+    // 监听窗口大小变化
+    window.addEventListener('resize', this.handleResize);
+    
+    // 检查URL查询参数
+    const queryParams = this.$route.query;
     if (queryParams.component) {
-      this.handleComponentNavigation(queryParams)
+      this.handleComponentNavigation(queryParams);
     }
   },
   mounted() {
@@ -230,25 +261,33 @@ export default {
       }
     },
     handleSelect(key) {
-      this.activeMenu = key
+      this.activeMenu = key;
       
       switch (key) {
         case 'dashboard':
-          this.currentComponent = null
-          this.componentParams = {}
-          break
+          this.currentComponent = null;
+          this.$router.push('/user');
+          break;
         case 'problems':
-          this.currentComponent = 'ProblemList'
-          this.componentParams = {}
-          break
+          this.currentComponent = 'ProblemList';
+          this.componentParams = { isAdmin: false };
+          break;
+        case 'competitions':
+          this.currentComponent = 'UserCompetitions';
+          this.componentParams = { competitions: this.competitions };
+          break;
         case 'submissions':
-          this.currentComponent = 'SubmissionList'
-          this.componentParams = {}
-          break
+          this.currentComponent = 'SubmissionList';
+          this.componentParams = { isAdmin: false };
+          break;
         case 'leaderboard':
-          this.currentComponent = 'Leaderboard'
-          this.componentParams = {}
-          break
+          this.currentComponent = 'Leaderboard';
+          break;
+        case 'account':
+          this.currentComponent = 'AccountSettings';
+          break;
+        default:
+          this.currentComponent = null;
       }
       
       // 更新URL以支持刷新和分享
@@ -308,6 +347,11 @@ export default {
           this.currentComponent = 'ProblemDetail'
           this.componentParams = { problemId: queryParams.problemId }
           break
+        case 'competitions':
+          this.activeMenu = 'competitions'
+          this.currentComponent = 'UserCompetitions'
+          this.componentParams = { competitions: this.competitions }
+          break
         case 'submissions':
           this.activeMenu = 'submissions'
           this.currentComponent = 'SubmissionList'
@@ -322,6 +366,54 @@ export default {
           this.activeMenu = 'dashboard'
           this.currentComponent = null
           this.componentParams = {}
+      }
+    },
+    // 加载比赛数据
+    loadCompetitions() {
+      try {
+        const competitionsJson = localStorage.getItem('competitions');
+        if (competitionsJson) {
+          let allCompetitions = JSON.parse(competitionsJson);
+          // 过滤掉未开始和已结束的比赛
+          const now = Date.now();
+          this.competitions = allCompetitions.filter(comp => 
+            comp.startDate <= now && comp.endDate >= now
+          );
+        } else {
+          this.competitions = [];
+        }
+      } catch (error) {
+        console.error('加载比赛数据失败:', error);
+        this.competitions = [];
+      }
+    },
+    
+    // 加载用户信息
+    fetchUserInfo() {
+      // 优先从store中获取用户信息
+      const userInfo = this.$store.getters.currentUser;
+      if (userInfo) {
+        this.username = userInfo.username || '用户';
+        this.email = userInfo.email || '';
+        this.role = userInfo.role || 1;
+      } else {
+        // 如果store中没有，则调用API获取
+        getUserInfo()
+          .then(response => {
+            const { data } = response;
+            this.username = data.username || '用户';
+            this.email = data.email || '';
+            this.role = data.role || 1;
+            // 更新store中的用户信息
+            this.$store.commit('SET_USER', data);
+          })
+          .catch(error => {
+            console.error('获取用户信息失败', error);
+            this.$message.error('获取用户信息失败，请重新登录');
+            // 登录状态失效，返回登录页
+            this.$store.dispatch('logout');
+            this.$router.push('/login');
+          });
       }
     }
   }
