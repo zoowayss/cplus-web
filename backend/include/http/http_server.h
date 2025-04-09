@@ -19,6 +19,7 @@ namespace http {
         std::string http_version;
         std::map<std::string, std::string> headers;
         std::string body;
+        std::map<std::string, std::string> params; // 新增参数存储
         
         // 从 httplib::Request 创建此适配器
         static Request from_httplib(const httplib::Request& req) {
@@ -28,6 +29,8 @@ namespace http {
             std::string query_string;
             for (const auto& param : req.params) {
                 query_string += param.first + "=" + param.second + "&";
+                // 存储参数
+                new_req.params[param.first] = param.second;
             }
             new_req.path = req.path+"?"+query_string;
             new_req.http_version = "HTTP/1.1"; // httplib 默认使用 HTTP/1.1
@@ -44,6 +47,20 @@ namespace http {
         std::string get_header(const std::string& key) const {
             auto it = headers.find(key);
             if (it != headers.end()) {
+                return it->second;
+            }
+            return "";
+        }
+        
+        // 新增：检查是否存在参数
+        bool has_param(const std::string& key) const {
+            return params.find(key) != params.end();
+        }
+        
+        // 新增：获取参数值
+        std::string get_param(const std::string& key) const {
+            auto it = params.find(key);
+            if (it != params.end()) {
                 return it->second;
             }
             return "";

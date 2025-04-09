@@ -777,89 +777,111 @@ bool UserService::updateUserLeaderboardStats(int user_id, int problem_id, bool i
 bool UserService::getAllUsers(int offset, int limit, const std::string& search_term, 
                             int role_filter, int status_filter, Json::Value& user_data, 
                             int& total, std::string& error_message) {
-    // 获取数据库连接
-    Database* db = Database::getInstance();
-    
-    // 构建查询条件
-    std::string where_clause = "WHERE 1=1 ";
-    
-    // 添加搜索条件
-    if (!search_term.empty()) {
-        where_clause += "AND (username LIKE '%" + search_term + "%' OR email LIKE '%" + search_term + "%') ";
-    }
-    
-    // 添加角色筛选
-    if (role_filter >= 0 && role_filter <= 2) {
-        where_clause += "AND role = " + std::to_string(role_filter) + " ";
-    }
-    
-    // 添加状态筛选
-    if (status_filter >= 0 && status_filter <= 2) {
-        where_clause += "AND status = " + std::to_string(status_filter) + " ";
-    }
-    
-    // 查询用户总数
-    std::string count_query = "SELECT COUNT(*) FROM users " + where_clause;
-    MYSQL_RES* count_result = db->executeQuery(count_query);
-    
-    if (!count_result) {
-        error_message = "获取用户列表失败，数据库错误";
-        return false;
-    }
-    
-    MYSQL_ROW count_row = mysql_fetch_row(count_result);
-    if (!count_row || !count_row[0]) {
+    try {
+        // 获取数据库连接
+        Database* db = Database::getInstance();
+        if (!db) {
+            error_message = "无法获取数据库连接";
+            return false;
+        }
+        
+        // 构建查询条件
+        std::string where_clause = "WHERE 1=1 ";
+        
+        // 添加搜索条件 - 确保安全转义
+        if (!search_term.empty()) {
+            std::string escaped_search = db->escapeString(search_term);
+            where_clause += "AND (username LIKE '%" + escaped_search + "%' OR email LIKE '%" + escaped_search + "%') ";
+        }
+        
+        // 添加角色筛选
+        if (role_filter >= 0 && role_filter <= 2) {
+            where_clause += "AND role = " + std::to_string(role_filter) + " ";
+        }
+        
+        // 添加状态筛选
+        if (status_filter >= 0 && status_filter <= 2) {
+            where_clause += "AND status = " + std::to_string(status_filter) + " ";
+        }
+        
+        // 防止offset或limit过大导致的性能问题
+        if (offset < 0) offset = 0;
+        if (limit <= 0 || limit > 100) limit = 10;
+        
+        // 查询用户总数
+        std::string count_query = "SELECT COUNT(*) FROM users " + where_clause;
+        MYSQL_RES* count_result = db->executeQuery(count_query);
+        
+        if (!count_result) {
+            error_message = "获取用户列表失败，数据库错误: 无法执行计数查询";
+            return false;
+        }
+        
+        MYSQL_ROW count_row = mysql_fetch_row(count_result);
+        if (!count_row || !count_row[0]) {
+            mysql_free_result(count_result);
+            error_message = "获取用户列表失败，数据库错误: 无法获取用户数量";
+            return false;
+        }
+        
+        // 设置总用户数
+        total = std::stoi(count_row[0]);
         mysql_free_result(count_result);
-        error_message = "获取用户列表失败，数据库错误";
-        return false;
-    }
-    
-    // 设置总用户数
-    total = std::stoi(count_row[0]);
-    mysql_free_result(count_result);
-    
-    // 如果没有用户，直接返回空数组
-    if (total == 0) {
+        
+        // 如果没有用户，直接返回空数组
+        if (total == 0) {
+            user_data = Json::Value(Json::arrayValue);
+            return true;
+        }
+        
+        // 分页查询用户列表
+        std::string query = "SELECT * FROM users " + where_clause +
+                            "ORDER BY id DESC LIMIT " + std::to_string(limit) + 
+                            " OFFSET " + std::to_string(offset);
+        
+        MYSQL_RES* result = db->executeQuery(query);
+        
+        if (!result) {
+            error_message = "获取用户列表失败，数据库错误: 无法执行用户列表查询";
+            return false;
+        }
+        
+        // 处理查询结果
+        int num_rows = mysql_num_rows(result);
         user_data = Json::Value(Json::arrayValue);
+        
+        for (int i = 0; i < num_rows; i++) {
+            try {
+                User user = User::fromDatabaseResult(result, i);
+                
+                // 转换为JSON对象（不包含敏感信息）
+                Json::Value user_obj;
+                user_obj["id"] = user.getId();
+                user_obj["username"] = user.getUsername();
+                user_obj["email"] = user.getEmail();
+                user_obj["avatar"] = user.getAvatar();
+                user_obj["role"] = static_cast<int>(user.getRole());
+                user_obj["status"] = static_cast<int>(user.getStatus());
+                user_obj["created_at"] = static_cast<Json::Int64>(user.getCreatedAt());
+                user_obj["updated_at"] = static_cast<Json::Int64>(user.getUpdatedAt());
+                user_obj["last_login"] = static_cast<Json::Int64>(user.getLastLogin());
+                
+                user_data.append(user_obj);
+            } catch (const std::exception& e) {
+                // 记录错误但继续处理其他用户
+                std::cerr << "处理用户数据时出错: " << e.what() << std::endl;
+            }
+        }
+        
+        mysql_free_result(result);
         return true;
-    }
-    
-    // 分页查询用户列表
-    std::string query = "SELECT * FROM users " + where_clause +
-                        "ORDER BY id DESC LIMIT " + std::to_string(limit) + 
-                        " OFFSET " + std::to_string(offset);
-    
-    MYSQL_RES* result = db->executeQuery(query);
-    
-    if (!result) {
-        error_message = "获取用户列表失败，数据库错误";
+    } catch (const std::exception& e) {
+        error_message = "获取用户列表时发生错误: " + std::string(e.what());
+        return false;
+    } catch (...) {
+        error_message = "获取用户列表时发生未知错误";
         return false;
     }
-    
-    // 处理查询结果
-    int num_rows = mysql_num_rows(result);
-    user_data = Json::Value(Json::arrayValue);
-    
-    for (int i = 0; i < num_rows; i++) {
-        User user = User::fromDatabaseResult(result, i);
-        
-        // 转换为JSON对象（不包含敏感信息）
-        Json::Value user_obj;
-        user_obj["id"] = user.getId();
-        user_obj["username"] = user.getUsername();
-        user_obj["email"] = user.getEmail();
-        user_obj["avatar"] = user.getAvatar();
-        user_obj["role"] = static_cast<int>(user.getRole());
-        user_obj["status"] = static_cast<int>(user.getStatus());
-        user_obj["created_at"] = static_cast<Json::Int64>(user.getCreatedAt());
-        user_obj["updated_at"] = static_cast<Json::Int64>(user.getUpdatedAt());
-        user_obj["last_login"] = static_cast<Json::Int64>(user.getLastLogin());
-        
-        user_data.append(user_obj);
-    }
-    
-    mysql_free_result(result);
-    return true;
 }
 
 // 通过管理员创建用户
